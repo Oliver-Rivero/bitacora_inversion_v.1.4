@@ -154,7 +154,7 @@ export default function ReportsView() {
         p.totalGain = p.latentGain + p.realizedGainInRange + p.dividendsInRange + p.interestsInRange
         p.gainPct = (p.startValue + p.buysInRange) > 0.01 ? (p.totalGain / (p.startValue + p.buysInRange)) * 100 : 0
 
-        if (Math.abs(p.startValue) < 0.01 && Math.abs(p.endValue) < 0.01 && Math.abs(p.buysInRange) < 0.01) return
+        if (Math.abs(p.startValue) < 0.01 && Math.abs(p.endValue) < 0.01 && Math.abs(p.buysInRange) < 0.01 && Math.abs(p.dividendsInRange) < 0.01 && Math.abs(p.interestsInRange) < 0.01 && Math.abs(p.realizedGainInRange) < 0.01) return
         const cat = p.assetType || 'Otros'
         if (!categoriesMap[cat]) categoriesMap[cat] = { name: cat, products: [], startValue: 0, endValue: 0, latentGain: 0, realizedGain: 0, dividends: 0, interests: 0 }
         categoriesMap[cat].products.push(p); categoriesMap[cat].startValue += p.startValue; categoriesMap[cat].endValue += p.endValue; categoriesMap[cat].latentGain += p.latentGain

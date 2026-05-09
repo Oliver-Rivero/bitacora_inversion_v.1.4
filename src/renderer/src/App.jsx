@@ -102,7 +102,7 @@ export default function App() {
             {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
           </div>
           <div style={{ padding: '8px 12px', fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>
-            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E93' }}>v.1.4.</div>
+            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E93' }}>beta 1.4</div>
           </div>
         </div>
       </div>
