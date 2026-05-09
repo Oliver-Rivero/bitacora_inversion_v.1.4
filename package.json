@@ -1,0 +1,52 @@
+{
+  "name": "mi-cartera",
+  "version": "1.4.0",
+  "description": "Aplicación de gestión de cartera de inversión",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "postinstall": "electron-builder install-app-deps",
+    "build:mac": "npm run build && electron-builder --mac"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.0",
+    "@electron-toolkit/utils": "^3.0.0",
+    "better-sqlite3": "^9.6.0",
+    "clsx": "^2.1.1",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2",
+    "lucide-react": "^0.378.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.12.7",
+    "xlsx": "^0.18.5",
+    "yahoo-finance2": "^2.11.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.3",
+    "electron-vite": "^2.3.0",
+    "vite": "^5.2.0"
+  },
+  "build": {
+    "appId": "com.oliver.micartera",
+    "productName": "Bitacora Inversion",
+    "directories": {
+      "output": "release/${version}"
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "node_modules/better-sqlite3/**/*"
+    ],
+    "mac": {
+      "target": "dmg",
+      "icon": "build/icon.png",
+      "category": "public.app-category.finance"
+    }
+  }
+}

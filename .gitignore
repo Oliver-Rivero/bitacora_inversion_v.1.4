@@ -1,0 +1,38 @@
+# Dependencias
+node_modules/
+
+# Compilación y Salida
+dist/
+dist-ssr/
+out/
+release/
+build/
+*.dmg
+*.pkg
+*.zip
+
+# Backups y Datos Sensibles
+backups/
+*.db
+*.sqlite
+*.sqlite3
+
+# Iconos y Diseño (Pesados)
+iconoPhotoshop/
+Bitacora-Instalador.dmg
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# Logs y Cache
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.eslintcache
+.DS_Store
+
+# VS Code
+.vscode/
+!.vscode/extensions.json
