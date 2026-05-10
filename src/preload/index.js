@@ -45,6 +45,13 @@ const api = {
   saveAssetMetadata: (meta) => ipcRenderer.invoke('db-save-asset-metadata', meta),
   fetchOnlineMetadata: (symbol) => ipcRenderer.invoke('finance-get-metadata', symbol),
   
+  // Radar
+  getRadarAssets: () => ipcRenderer.invoke('db-get-radar-assets'),
+  addRadarAsset: (asset) => ipcRenderer.invoke('db-add-radar-asset', asset),
+  deleteRadarAsset: (id) => ipcRenderer.invoke('db-delete-radar-asset', id),
+  getChartData: (symbol, range) => ipcRenderer.invoke('finance-get-chart-data', { symbol, range }),
+  resolveISIN: (isin) => ipcRenderer.invoke('finance-resolve-isin', isin),
+
   error: (msg) => ipcRenderer.send('log-error', msg)
 }
 

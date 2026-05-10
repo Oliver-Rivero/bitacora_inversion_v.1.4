@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { LayoutDashboard, Wallet, Building2, ArrowRightLeft, Settings, Sun, Moon, RefreshCw, FileText, Sparkles, TrendingUp, Wrench, Plus } from 'lucide-react'
+import { LayoutDashboard, Wallet, Building2, ArrowRightLeft, Settings, Sun, Moon, RefreshCw, FileText, Sparkles, TrendingUp, Wrench, Plus, Radar } from 'lucide-react'
 import { clsx } from 'clsx'
 import DashboardView from './components/DashboardView'
 import AnalyticsView from './components/AnalyticsView'
@@ -9,6 +9,7 @@ import AssetsView from './components/AssetsView'
 import ReportsView from './components/ReportsView'
 import EntitiesDetailView from './components/EntitiesDetailView'
 import ToolsView from './components/ToolsView'
+import RadarView from './components/RadarView'
 import { useData } from './context/DataContext'
 import logoLight from './assets/logo-light.png'
 import logoDark from './assets/logo-dark.png'
@@ -31,6 +32,7 @@ export default function App() {
     { id: 'ledger', label: 'Libro Mayor', icon: ArrowRightLeft },
     { id: 'reports', label: 'Informes', icon: FileText },
     { id: 'analytics', label: 'Análisis Avanzado', icon: TrendingUp },
+    { id: 'radar', label: 'Radar', icon: Radar },
     { id: 'tools', label: 'Herramientas', icon: Wrench },
     { id: 'settings', label: 'Configuración', icon: Settings },
   ]
@@ -102,7 +104,7 @@ export default function App() {
             {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
           </div>
           <div style={{ padding: '8px 12px', fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>
-            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E93' }}>beta 1.6</div>
+            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E8E' }}>beta 1.7</div>
           </div>
         </div>
       </div>
@@ -114,6 +116,7 @@ export default function App() {
         {activeTab === 'ledger' && <LedgerView />}
         {activeTab === 'reports' && <ReportsView />}
         {activeTab === 'analytics' && <AnalyticsView />}
+        {activeTab === 'radar' && <RadarView />}
         {activeTab === 'tools' && <ToolsView />}
         { activeTab === 'settings' && <ConfigView /> }
       </div>

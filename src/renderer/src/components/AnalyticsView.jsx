@@ -95,7 +95,7 @@ export default function AnalyticsView() {
     userProfile, updateProfile, quotes, fxRate, categories, assetTypes 
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals' | 'health'
+  const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals' | 'diversification'
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
   const [viewMode, setViewMode] = useState('monthly');
@@ -195,10 +195,10 @@ export default function AnalyticsView() {
             <Target size={16} /> Objetivos
           </button>
           <button 
-            className={`tool-tab ${activeTab === 'health' ? 'active' : ''}`}
-            onClick={() => setActiveTab('health')}
+            className={`tool-tab ${activeTab === 'diversification' ? 'active' : ''}`}
+            onClick={() => setActiveTab('diversification')}
           >
-            <ShieldCheck size={16} /> Salud
+            <ShieldCheck size={16} /> Diversificación
           </button>
         </div>
       </div>
@@ -363,7 +363,7 @@ export default function AnalyticsView() {
           quotes={quotes}
           fxRate={fxRate}
         />
-      ) : activeTab === 'health' ? (
+      ) : activeTab === 'diversification' ? (
         <HealthAnalysis />
       ) : (
         <AIIntelligence />

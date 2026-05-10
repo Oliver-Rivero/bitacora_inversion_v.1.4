@@ -286,8 +286,26 @@ app.whenReady().then(() => {
     return true
   })
 
+  // Radar Handlers
+  ipcMain.handle('db-get-radar-assets', () => {
+    return db.prepare('SELECT * FROM radar_assets ORDER BY addedAt DESC').all()
+  })
+
+  ipcMain.handle('db-add-radar-asset', (_, asset) => {
+    const { symbol, name, initialPrice, notes } = asset
+    const stmt = db.prepare('INSERT INTO radar_assets (symbol, name, initialPrice, notes) VALUES (?, ?, ?, ?)')
+    const info = stmt.run(symbol.toUpperCase(), name, initialPrice, notes)
+    return info.lastInsertRowid
+  })
+
+  ipcMain.handle('db-delete-radar-asset', (_, id) => {
+    const stmt = db.prepare('DELETE FROM radar_assets WHERE id = ?')
+    stmt.run(id)
+    return true
+  })
+
   ipcMain.handle('db-reset-all-data', () => {
-    const tables = ['transactions', 'entities', 'savings_contributions', 'savings_goals', 'snapshots', 'categories', 'asset_types']
+    const tables = ['transactions', 'entities', 'savings_contributions', 'savings_goals', 'snapshots', 'categories', 'asset_types', 'radar_assets']
     const transaction = db.transaction(() => {
       tables.forEach(table => {
         db.prepare(`DELETE FROM ${table}`).run()

@@ -144,4 +144,49 @@ export function setupFinanceHandlers() {
       return null
     }
   })
+
+  ipcMain.handle('finance-get-chart-data', async (_, { symbol, range = '1mo' }) => {
+    try {
+      // range options: 1d, 5d, 1mo, 3mo, 6mo, 1y, 2y, 5y, 10y, ytd, max
+      // interval options: 1m, 2m, 5m, 15m, 30m, 60m, 90m, 1h, 1d, 5d, 1wk, 1mo, 3mo
+      let interval = '1d'
+      if (range === '1d') interval = '5m'
+      if (range === '5d') interval = '30m'
+
+      const url = `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=${interval}`
+      const response = await fetch(url)
+      const data = await response.json()
+      
+      const result = data.chart?.result?.[0]
+      if (result) {
+        const timestamps = result.timestamp || []
+        const closes = result.indicators?.quote?.[0]?.close || []
+        
+        // Clean data: map to { time, value } and filter nulls
+        const chartPoints = timestamps.map((t, i) => ({
+          time: t,
+          value: closes[i]
+        })).filter(p => p.value !== null)
+
+        return chartPoints
+      }
+      return []
+    } catch (e) {
+      console.error(`Chart data fetch error for ${symbol}:`, e)
+      return []
+    }
+  })
+
+  ipcMain.handle('finance-resolve-isin', async (_, isin) => {
+    try {
+      const url = `https://query2.finance.yahoo.com/v1/finance/search?q=${isin}`
+      const response = await fetch(url)
+      const data = await response.json()
+      const bestMatch = data.quotes?.find(q => q.isYahooFinance)
+      return bestMatch?.symbol || null
+    } catch (e) {
+      console.error(`ISIN resolution error for ${isin}:`, e)
+      return null
+    }
+  })
 }

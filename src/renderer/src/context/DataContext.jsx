@@ -13,6 +13,7 @@ export function DataProvider({ children }) {
   const [savingsGoals, setSavingsGoals] = useState([])
   const [snapshots, setSnapshots] = useState([])
   const [assetsMetadata, setAssetsMetadata] = useState({})
+  const [radarAssets, setRadarAssets] = useState([])
   const [loading, setLoading] = useState(true)
   const [ledgerFormRequested, setLedgerFormRequested] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
@@ -98,7 +99,7 @@ export function DataProvider({ children }) {
   const fetchData = async () => {
     try {
       setLoading(true);
-      let ents = [], txns = [], cats = [], types = [], goals = [];
+      let ents = [], txns = [], cats = [], types = [], goals = [], rAssets = [];
       
       try {
         ents = await window.api.getEntities();
@@ -106,6 +107,7 @@ export function DataProvider({ children }) {
         cats = await window.api.getCategories();
         types = await window.api.getAssetTypes();
         goals = await window.api.getSavingsGoals();
+        rAssets = await window.api.getRadarAssets();
       } catch (e) {
         console.error('Data fetch failed:', e);
       }
@@ -129,9 +131,11 @@ export function DataProvider({ children }) {
       setCategories(finalCats)
       setAssetTypes(finalTypes)
       setSavingsGoals(goals || [])
+      setRadarAssets(rAssets || [])
 
       const symbols = txns ? [...new Set(txns.map(t => (t.symbol || t.name || '').toUpperCase()))].filter(Boolean) : []
-      const symbolsToFetch = [...symbols, 'EURUSD=X']
+      const radarSymbols = rAssets ? rAssets.map(a => a.symbol.toUpperCase()) : []
+      const symbolsToFetch = [...new Set([...symbols, ...radarSymbols, 'EURUSD=X'])]
       
       if (symbolsToFetch.length > 0) {
         const results = await window.api.getQuotes(symbolsToFetch)
@@ -245,6 +249,11 @@ export function DataProvider({ children }) {
     addAssetType: async (at) => { await window.api.addAssetType(at); await fetchData(); },
     editAssetType: async (at) => { await window.api.editAssetType(at); await fetchData(); },
     deleteAssetType: async (id) => { await window.api.deleteAssetType(id); await fetchData(); },
+
+    // Radar CRUD
+    radarAssets,
+    addRadarAsset: async (a) => { await window.api.addRadarAsset(a); await fetchData(); },
+    deleteRadarAsset: async (id) => { await window.api.deleteRadarAsset(id); await fetchData(); },
 
     // Milestones Management
     milestones,

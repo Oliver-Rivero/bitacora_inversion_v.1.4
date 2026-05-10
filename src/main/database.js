@@ -107,6 +107,14 @@ export function setupDatabase() {
       description TEXT,
       last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS radar_assets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      symbol TEXT NOT NULL UNIQUE,
+      name TEXT,
+      initialPrice REAL,
+      notes TEXT,
+      addedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `)
 
   try {
@@ -206,6 +214,19 @@ export function saveAssetMetadata(meta) {
     INSERT OR REPLACE INTO asset_metadata (symbol, sector, industry, country, description, last_updated)
     VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
   `).run(meta.symbol, meta.sector, meta.industry, meta.country, meta.description)
+}
+
+// Radar Functions
+export function getRadarAssets() {
+  return db.prepare('SELECT * FROM radar_assets ORDER BY addedAt DESC').all()
+}
+
+export function addRadarAsset(asset) {
+  return db.prepare('INSERT INTO radar_assets (symbol, name, initialPrice, notes) VALUES (?, ?, ?, ?)').run(asset.symbol.toUpperCase(), asset.name, asset.initialPrice, asset.notes)
+}
+
+export function deleteRadarAsset(id) {
+  return db.prepare('DELETE FROM radar_assets WHERE id = ?').run(id)
 }
 
 export function getDb() {
