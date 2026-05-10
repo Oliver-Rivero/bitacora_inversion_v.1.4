@@ -3,12 +3,91 @@ import { useData } from '../context/DataContext';
 import { 
   Calendar, TrendingUp, TrendingDown, Wallet, 
   Search, PieChart as PieChartIcon, ArrowUpDown,
-  Activity, Target, Trophy, Edit3, Save, Info, ArrowRight
+  Activity, Target, Trophy, Edit3, Save, Info, ArrowRight,
+  ShieldCheck, Globe, Sparkles, AlertTriangle, Zap, Briefcase
 } from 'lucide-react';
 import { 
   ResponsiveContainer, Tooltip as RechartsTooltip, Cell,
   PieChart, Pie
 } from 'recharts';
+
+const styles = `
+  .tool-tab {
+    padding: 10px 20px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+  }
+  .tool-tab:hover {
+    color: var(--text-main);
+    background: rgba(126, 145, 177, 0.08);
+  }
+  .tool-tab.active {
+    background: var(--panel-bg);
+    color: var(--accent);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+  }
+  .period-select {
+    padding: 10px 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-main);
+    font-size: 14px;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+  }
+  .metric-card {
+    padding: 32px;
+    border-radius: 24px;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s;
+  }
+  .metric-card:hover { transform: translateY(-4px); }
+  .tag {
+    font-size: 9px;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .tag-in { background: rgba(52, 199, 89, 0.15); color: #2e7d32; }
+  .tag-out { background: rgba(255, 59, 48, 0.15); color: #d32f2f; }
+  .tag-yield { background: rgba(0, 113, 227, 0.15); color: var(--accent); }
+  .tag-neutral { background: rgba(126, 145, 177, 0.15); color: var(--text-muted); }
+  .table-row-hover:hover { background: rgba(126, 145, 177, 0.08) !important; }
+  
+  @keyframes spinning {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .spinning {
+    animation: spinning 1s linear infinite;
+  }
+
+  .goal-input {
+    width: 100px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: var(--text-main);
+    font-weight: 800;
+    text-align: right;
+    outline: none;
+  }
+`;
 
 export default function AnalyticsView() {
   const { 
@@ -16,7 +95,7 @@ export default function AnalyticsView() {
     userProfile, updateProfile, quotes, fxRate, categories, assetTypes 
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals'
+  const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals' | 'health'
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
   const [viewMode, setViewMode] = useState('monthly');
@@ -113,7 +192,13 @@ export default function AnalyticsView() {
             className={`tool-tab ${activeTab === 'goals' ? 'active' : ''}`}
             onClick={() => setActiveTab('goals')}
           >
-            <Target size={16} /> Plan de Objetivos
+            <Target size={16} /> Objetivos
+          </button>
+          <button 
+            className={`tool-tab ${activeTab === 'health' ? 'active' : ''}`}
+            onClick={() => setActiveTab('health')}
+          >
+            <ShieldCheck size={16} /> Salud
           </button>
         </div>
       </div>
@@ -172,7 +257,7 @@ export default function AnalyticsView() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: 32 }}>
             <div className="glass-panel" style={{ padding: 32 }}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 32, fontSize: 18, fontWeight: 800 }}>
-                <PieChartIcon size={22} className="text-accent" /> Destino del Capital
+                <Activity size={22} className="text-accent" /> Destino del Capital
               </h3>
               <div style={{ height: 280 }}>
                 {periodData.distribution.length > 0 ? (
@@ -243,7 +328,6 @@ export default function AnalyticsView() {
                         const isOut = ['Venta', 'Retiro', 'Retirada'].includes(t.operation);
                         const isYield = ['Dividendos', 'Intereses'].includes(t.operation);
                         
-                        // Formatear fecha dd-mm-aaaa
                         const formattedDate = t.date ? t.date.split('-').reverse().join('-') : '-';
                         
                         return (
@@ -268,7 +352,7 @@ export default function AnalyticsView() {
             </div>
           </div>
         </>
-      ) : (
+      ) : activeTab === 'goals' ? (
         <GoalsAnalysis 
           transactions={transactions} 
           userProfile={userProfile} 
@@ -279,6 +363,10 @@ export default function AnalyticsView() {
           quotes={quotes}
           fxRate={fxRate}
         />
+      ) : activeTab === 'health' ? (
+        <HealthAnalysis />
+      ) : (
+        <AIIntelligence />
       )}
     </div>
   );
@@ -551,72 +639,329 @@ function GoalsAnalysis({ transactions, userProfile, updateProfile, formatCurrenc
   );
 }
 
-const styles = `
-  .tool-tab {
-    padding: 8px 16px;
-    border: none;
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-    border-radius: 10px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    transition: all 0.2s;
-  }
-  .tool-tab:hover {
-    color: var(--text-main);
-    background: rgba(126, 145, 177, 0.08);
-  }
-  .tool-tab.active {
-    background: var(--panel-bg);
-    color: var(--accent);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-  }
-  .period-select {
-    padding: 8px 12px;
-    background: transparent;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text-main);
-    font-size: 13px;
-    font-weight: 600;
-    outline: none;
-    cursor: pointer;
-  }
-  .metric-card {
-    padding: 32px;
-    border-radius: 24px;
-    position: relative;
-    overflow: hidden;
-    transition: transform 0.2s;
-  }
-  .metric-card:hover { transform: translateY(-4px); }
-  .tag {
-    font-size: 9px;
-    font-weight: 800;
-    padding: 4px 8px;
-    border-radius: 6px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-  }
-  .tag-in { background: rgba(52, 199, 89, 0.15); color: #2e7d32; }
-  .tag-out { background: rgba(255, 59, 48, 0.15); color: #d32f2f; }
-  .tag-yield { background: rgba(0, 113, 227, 0.15); color: var(--accent); }
-  .tag-neutral { background: rgba(126, 145, 177, 0.15); color: var(--text-muted); }
-  .table-row-hover:hover { background: rgba(126, 145, 177, 0.08) !important; }
-  
-  .goal-input {
-    width: 80px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.2);
-    border-radius: 6px;
-    padding: 4px 8px;
-    color: var(--text-main);
-    font-weight: 800;
-    text-align: right;
-    outline: none;
-  }
-`;
+
+function HealthAnalysis() {
+  const { transactions, quotes, fxRate, assetsMetadata, syncProgress, formatCurrency, formatPercent, fetchData } = useData();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const [showClassification, setShowClassification] = useState(false);
+  const [editingMeta, setEditingMeta] = useState({});
+
+  const handleOpenClassification = () => {
+    setEditingMeta({ ...assetsMetadata });
+    setShowClassification(true);
+  };
+
+  const handleSaveClassification = async () => {
+    try {
+      // Save all to db and context
+      const symbolsToSave = Object.keys(editingMeta);
+      
+      for (const sym of symbolsToSave) {
+        const meta = editingMeta[sym];
+        if (!meta) continue;
+        
+        // Only save if there is actually something to save
+        if (meta.sector || meta.country) {
+          const payload = { 
+            symbol: sym, 
+            sector: meta.sector || 'Otros', 
+            industry: 'Otros', 
+            country: meta.country || 'Global', 
+            description: '' 
+          };
+          await window.api.saveAssetMetadata(payload);
+        }
+      }
+      
+      await fetchData();
+      setShowClassification(false);
+      alert('Clasificación guardada con éxito');
+    } catch (err) {
+      console.error('Error saving classification:', err);
+      alert('Error al guardar: ' + (err.message || 'Error desconocido'));
+    }
+  };
+
+  const assetNames = useMemo(() => {
+    const names = {};
+    if (!transactions) return names;
+    transactions.forEach(t => {
+      const sym = (t.symbol || t.name || '').toUpperCase();
+      if (sym && t.name && (!names[sym] || names[sym] === sym)) {
+        names[sym] = t.name;
+      }
+    });
+    Object.entries(quotes).forEach(([sym, q]) => {
+      if (q.shortName) names[sym.toUpperCase()] = q.shortName;
+    });
+    return names;
+  }, [transactions, quotes]);
+
+  const uniqueSymbols = useMemo(() => {
+    if (!transactions) return [];
+    return [...new Set(transactions.map(t => (t.symbol || t.name || '').toUpperCase()))].filter(Boolean);
+  }, [transactions]);
+
+  const healthData = useMemo(() => {
+    if (!transactions) return { totalVal: 0, sectorData: [], countryData: [], assetRisk: [] };
+
+    const holdings = {};
+    const sortedTxns = [...transactions].sort((a,b) => (a.date || '').localeCompare(b.date || ''));
+    
+    sortedTxns.forEach(t => {
+      const symbol = (t.symbol || t.name || 'Unknown').toUpperCase();
+      const key = `${t.entityId}_${symbol}`;
+      if (!holdings[key]) holdings[key] = { symbol, shares: 0, invested: 0 };
+      
+      const mult = ['Venta', 'Retirada', 'Retiro'].includes(t.operation) ? -1 : 1;
+      holdings[key].shares += (Number(t.shares) || 0) * mult;
+      if (mult > 0) holdings[key].invested += Math.abs(Number(t.total) || 0);
+      else holdings[key].invested -= Math.abs(Number(t.total) || 0);
+    });
+
+    let totalVal = 0;
+    const items = [];
+    Object.values(holdings).forEach(h => {
+      if (h.shares > 0.0001) {
+        const q = quotes[h.symbol] || {};
+        const price = q.price || 0;
+        const effectivePrice = q.currency === 'USD' ? (price / (fxRate || 1.10)) : price;
+        const val = effectivePrice > 0 ? (h.shares * effectivePrice) : h.invested;
+        totalVal += val;
+        items.push({ ...h, currentVal: val });
+      }
+    });
+
+    const sectorMap = {};
+    const countryMap = {};
+    const assetRisk = [];
+    let unclassifiedVal = 0;
+
+    items.forEach(h => {
+      const meta = assetsMetadata[h.symbol] || { sector: 'Pendiente de identificar', country: 'Pendiente de identificar' };
+      const weight = totalVal > 0 ? (h.currentVal / totalVal) * 100 : 0;
+
+      sectorMap[meta.sector] = (sectorMap[meta.sector] || 0) + h.currentVal;
+      countryMap[meta.country] = (countryMap[meta.country] || 0) + h.currentVal;
+
+      if (meta.sector === 'Pendiente de identificar' || meta.country === 'Pendiente de identificar') {
+        unclassifiedVal += h.currentVal;
+      }
+
+      if (weight > 15) {
+        assetRisk.push({ 
+          name: assetNames[h.symbol] || h.symbol, 
+          symbol: h.symbol, 
+          weight, 
+          type: 'concentration' 
+        });
+      }
+    });
+
+    if (unclassifiedVal > 0) {
+      const unclassifiedPct = totalVal > 0 ? (unclassifiedVal / totalVal) * 100 : 0;
+      assetRisk.push({
+        name: 'Activos sin clasificar',
+        weight: unclassifiedPct,
+        type: 'missing_metadata'
+      });
+    }
+
+    const COLORS = ['#7E91B1', '#899A81', '#BFA89A', '#D9CD96', '#BDE0FE', '#A29BBD', '#FFD700', '#D18B8B'];
+
+    const sectorData = Object.entries(sectorMap).map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] })).sort((a,b) => b.value - a.value);
+    const countryData = Object.entries(countryMap).map(([name, value], i) => ({ name, value, color: COLORS[i % COLORS.length] })).sort((a,b) => b.value - a.value);
+
+    // Calculate score: Base 10. Subtract for concentration and for missing metadata.
+    let score = 10;
+    assetRisk.forEach(r => {
+      if (r.type === 'concentration') score -= 1.5;
+      if (r.type === 'missing_metadata') score -= (r.weight / 10); // Penalty proportional to weight
+    });
+    score = Math.max(1, Math.min(10, score));
+
+    return { totalVal, sectorData, countryData, assetRisk, score };
+  }, [transactions, quotes, fxRate, assetsMetadata]);
+
+  return (
+    <div className="wizard-slide-enter">
+      {showClassification && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(10, 15, 30, 0.8)', backdropFilter: 'blur(8px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 999
+        }}>
+          <div className="glass-panel" style={{ width: '90%', maxWidth: 700, padding: 32, maxHeight: '80vh', overflowY: 'auto' }}>
+            <h2 style={{ marginTop: 0, marginBottom: 8, fontSize: 18 }}>Clasificación Manual de Activos</h2>
+            <p style={{ color: 'var(--text-muted)', fontSize: 13, marginBottom: 24 }}>Asigna el sector y país a tus activos para que las gráficas de diversificación funcionen correctamente.</p>
+            
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 16, marginBottom: 12, fontWeight: 700, fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+              <div>Activo / Símbolo</div>
+              <div>Sector Principal</div>
+              <div>Región / País</div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 32 }}>
+              {uniqueSymbols.map(sym => (
+                <div key={sym} style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr', gap: 16, alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text)' }}>{assetNames[sym] || sym}</div>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>{sym}</div>
+                  </div>
+                  <input 
+                    placeholder="Ej: Tecnología"
+                    value={editingMeta[sym]?.sector === 'Pendiente de identificar' ? '' : (editingMeta[sym]?.sector || '')}
+                    onChange={e => setEditingMeta(prev => ({ ...prev, [sym]: { ...prev[sym], sector: e.target.value } }))}
+                    style={{ padding: '8px 12px' }}
+                  />
+                  <input 
+                    placeholder="Ej: Estados Unidos"
+                    value={editingMeta[sym]?.country === 'Pendiente de identificar' ? '' : (editingMeta[sym]?.country || '')}
+                    onChange={e => setEditingMeta(prev => ({ ...prev, [sym]: { ...prev[sym], country: e.target.value } }))}
+                    style={{ padding: '8px 12px' }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: 16, justifyContent: 'flex-end' }}>
+              <button className="btn btn-secondary" onClick={() => setShowClassification(false)}>Cancelar</button>
+              <button className="btn" onClick={handleSaveClassification} style={{ background: 'var(--accent)', color: '#fff', border: 'none' }}>Guardar Clasificación</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1.2fr', gap: 20 }}>
+        {/* Column 1: Sectors */}
+        <div className="glass-panel" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Briefcase size={18} className="text-accent" /> Sectores
+          </h3>
+          <div style={{ height: 180, marginBottom: 20 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={healthData.sectorData} innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value" stroke="none">
+                  {healthData.sectorData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                </Pie>
+                <RechartsTooltip formatter={(v) => formatCurrency(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 250, paddingRight: 4 }}>
+             {healthData.sectorData.map(d => (
+               <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(126, 145, 177, 0.03)', borderRadius: 8 }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                   <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
+                 </div>
+                 <span style={{ fontSize: 11, fontWeight: 800, marginLeft: 8 }}>{formatPercent((d.value / (healthData.totalVal || 1)) * 100)}%</span>
+               </div>
+             ))}
+          </div>
+        </div>
+
+        {/* Column 2: Geography */}
+        <div className="glass-panel" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <Globe size={18} className="text-accent" /> Geografía
+          </h3>
+          <div style={{ height: 180, marginBottom: 20 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={healthData.countryData} innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value" stroke="none">
+                  {healthData.countryData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+                </Pie>
+                <RechartsTooltip formatter={(v) => formatCurrency(v)} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 250, paddingRight: 4 }}>
+             {healthData.countryData.map(d => (
+               <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(126, 145, 177, 0.03)', borderRadius: 8 }}>
+                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                   <div style={{ width: 6, height: 6, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                   <span style={{ fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.name}</span>
+                 </div>
+                 <span style={{ fontSize: 11, fontWeight: 800, marginLeft: 8 }}>{formatPercent((d.value / (healthData.totalVal || 1)) * 100)}%</span>
+               </div>
+             ))}
+          </div>
+        </div>
+
+        {/* Column 3: Alerts & Score */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          <button 
+            onClick={handleOpenClassification} 
+            className="btn" 
+            style={{ 
+              background: 'var(--accent)', 
+              color: 'white',
+              border: 'none', 
+              padding: '12px 20px', 
+              borderRadius: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 12,
+              fontSize: 14,
+              fontWeight: 800,
+              boxShadow: '0 8px 20px rgba(0, 113, 227, 0.2)',
+              width: '100%'
+            }}
+          >
+            <Edit3 size={18} /> Clasificar Activos
+          </button>
+
+          <div className="glass-panel" style={{ padding: 24, border: '1px solid var(--border)', flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+              <AlertTriangle size={18} className="text-accent" /> Alertas
+            </h3>
+            {healthData.assetRisk.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)' }}>
+                <ShieldCheck size={32} style={{ opacity: 0.2, marginBottom: 12 }} />
+                <p style={{ fontSize: 12, fontWeight: 600 }}>Sin riesgos críticos.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'grid', gap: 12, overflowY: 'auto', paddingRight: 4 }}>
+                {healthData.assetRisk.map((r, i) => (
+                  <div key={i} style={{ 
+                    padding: 14, 
+                    background: r.type === 'concentration' ? 'rgba(255, 59, 48, 0.05)' : 'rgba(255, 159, 10, 0.05)', 
+                    borderRadius: 12, 
+                    border: `1px solid ${r.type === 'concentration' ? 'rgba(255, 59, 48, 0.1)' : 'rgba(255, 159, 10, 0.1)'}` 
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      {r.type === 'concentration' ? <Zap size={14} style={{ color: 'var(--danger)' }} /> : <Info size={14} style={{ color: 'var(--warning)' }} />}
+                      <span style={{ fontWeight: 800, color: r.type === 'concentration' ? 'var(--danger)' : 'var(--warning)', fontSize: 10, textTransform: 'uppercase' }}>
+                        {r.type === 'concentration' ? 'Concentración' : 'Pendiente'}
+                      </span>
+                    </div>
+                    <p style={{ fontSize: 11, margin: 0, lineHeight: 1.4 }}>
+                      {r.type === 'concentration' ? (
+                        <><strong>{r.name}</strong> al <strong>{formatPercent(r.weight)}%</strong>.</>
+                      ) : (
+                        <>Un <strong>{formatPercent(r.weight)}%</strong> sin clasificar.</>
+                      )}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="glass-panel" style={{ padding: 20, background: 'linear-gradient(135deg, rgba(52, 199, 89, 0.1), transparent)' }}>
+             <h3 style={{ fontSize: 10, fontWeight: 800, color: 'var(--success)', textTransform: 'uppercase', marginBottom: 8 }}>Puntuación</h3>
+             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+               <span style={{ fontSize: 32, fontWeight: 900 }}>{healthData.score.toFixed(1)}</span>
+               <span style={{ fontSize: 14, color: 'var(--text-muted)', fontWeight: 700 }}>/10</span>
+             </div>
+             <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4, lineHeight: 1.4 }}>Diversificación y límites de riesgo.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+

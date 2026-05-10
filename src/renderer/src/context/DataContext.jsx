@@ -12,9 +12,11 @@ export function DataProvider({ children }) {
   const [fxRate, setFxRate] = useState(1) // 1 EUR = ? USD
   const [savingsGoals, setSavingsGoals] = useState([])
   const [snapshots, setSnapshots] = useState([])
+  const [assetsMetadata, setAssetsMetadata] = useState({})
   const [loading, setLoading] = useState(true)
   const [ledgerFormRequested, setLedgerFormRequested] = useState(false)
   const [userProfile, setUserProfile] = useState(null)
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 })
   const [milestones, setMilestones] = useState([
     { id: '10k', label: 'Primeros 10K €', target: 10000, type: 'capital' },
     { id: '50k', label: 'Ecuador de los 100K', target: 50000, type: 'capital' },
@@ -128,7 +130,7 @@ export function DataProvider({ children }) {
       setAssetTypes(finalTypes)
       setSavingsGoals(goals || [])
 
-      const symbols = txns ? [...new Set(txns.map(t => t.symbol).filter(Boolean))] : []
+      const symbols = txns ? [...new Set(txns.map(t => (t.symbol || t.name || '').toUpperCase()))].filter(Boolean) : []
       const symbolsToFetch = [...symbols, 'EURUSD=X']
       
       if (symbolsToFetch.length > 0) {
@@ -155,6 +157,11 @@ export function DataProvider({ children }) {
       // Fetch Snapshots
       const snps = await window.api.getSnapshots()
       setSnapshots(snps || [])
+
+      // Fetch Metadata from DB
+      const metaMap = await window.api.getAssetsMetadata(symbols)
+      setAssetsMetadata(metaMap)
+
     } catch (e) {
       console.error('Failed to fetch data:', e)
     } finally {
@@ -207,6 +214,7 @@ export function DataProvider({ children }) {
     refreshPrices,
     userProfile,
     updateProfile,
+    fetchData,
     ledgerFormRequested,
     setLedgerFormRequested,
     
@@ -265,6 +273,8 @@ export function DataProvider({ children }) {
     // Snapshots
     snapshots,
     takeSnapshot,
+    assetsMetadata,
+    syncProgress,
 
     // Advanced / Maintenance
     resetAllData: async () => {

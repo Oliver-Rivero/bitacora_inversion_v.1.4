@@ -262,6 +262,30 @@ app.whenReady().then(() => {
     return true
   })
 
+  // Asset Metadata Handlers
+  ipcMain.handle('db-get-assets-metadata', (_, symbols) => {
+    if (!symbols || symbols.length === 0) return {}
+    const placeholders = symbols.map(() => '?').join(',')
+    const rows = db.prepare(`SELECT * FROM asset_metadata WHERE symbol IN (${placeholders})`).all(...symbols)
+    const result = {}
+    rows.forEach(r => { result[r.symbol] = r })
+    return result
+  })
+
+  ipcMain.handle('db-get-asset-metadata', (_, symbol) => {
+    return db.prepare('SELECT * FROM asset_metadata WHERE symbol = ?').get(symbol)
+  })
+
+  ipcMain.handle('db-save-asset-metadata', (_, meta) => {
+    const { symbol, sector, industry, country, description } = meta
+    const stmt = db.prepare(`
+      INSERT OR REPLACE INTO asset_metadata (symbol, sector, industry, country, description, last_updated)
+      VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    `)
+    stmt.run(symbol, sector, industry, country, description)
+    return true
+  })
+
   ipcMain.handle('db-reset-all-data', () => {
     const tables = ['transactions', 'entities', 'savings_contributions', 'savings_goals', 'snapshots', 'categories', 'asset_types']
     const transaction = db.transaction(() => {

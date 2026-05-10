@@ -38,6 +38,13 @@ const api = {
   getSnapshots: () => ipcRenderer.invoke('db-get-snapshots'),
   saveSnapshot: (snapshot) => ipcRenderer.invoke('db-save-snapshot', snapshot),
   resetAllData: () => ipcRenderer.invoke('db-reset-all-data'),
+  
+  // Asset Metadata
+  getAssetsMetadata: (symbols) => ipcRenderer.invoke('db-get-assets-metadata', symbols),
+  getAssetMetadata: (symbol) => ipcRenderer.invoke('db-get-asset-metadata', symbol),
+  saveAssetMetadata: (meta) => ipcRenderer.invoke('db-save-asset-metadata', meta),
+  fetchOnlineMetadata: (symbol) => ipcRenderer.invoke('finance-get-metadata', symbol),
+  
   error: (msg) => ipcRenderer.send('log-error', msg)
 }
 

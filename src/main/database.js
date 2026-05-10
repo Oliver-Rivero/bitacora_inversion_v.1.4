@@ -61,6 +61,15 @@ export function setupDatabase() {
       value TEXT
     );
 
+    CREATE TABLE IF NOT EXISTS asset_metadata (
+      symbol TEXT PRIMARY KEY,
+      sector TEXT,
+      industry TEXT,
+      country TEXT,
+      description TEXT,
+      last_updated TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS savings_goals (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
@@ -89,11 +98,23 @@ export function setupDatabase() {
       costBasis REAL NOT NULL,
       unrealizedGain REAL NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS asset_metadata (
+      symbol TEXT PRIMARY KEY,
+      sector TEXT,
+      industry TEXT,
+      country TEXT,
+      description TEXT,
+      last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
+    );
   `)
 
   try {
     db.prepare("ALTER TABLE entities ADD COLUMN url TEXT").run()
-    console.log('Database migration: Added url column to entities table.')
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE asset_metadata ADD COLUMN last_updated TEXT").run()
   } catch (e) {}
 
   try {
@@ -174,6 +195,17 @@ export function setupDatabase() {
   } catch (err) {
     console.error('Error seeding database:', err)
   }
+}
+
+export function getAssetMetadata(symbol) {
+  return db.prepare('SELECT * FROM asset_metadata WHERE symbol = ?').get(symbol)
+}
+
+export function saveAssetMetadata(meta) {
+  return db.prepare(`
+    INSERT OR REPLACE INTO asset_metadata (symbol, sector, industry, country, description, last_updated)
+    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `).run(meta.symbol, meta.sector, meta.industry, meta.country, meta.description)
 }
 
 export function getDb() {
