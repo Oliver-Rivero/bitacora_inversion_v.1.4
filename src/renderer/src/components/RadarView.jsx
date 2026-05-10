@@ -49,7 +49,7 @@ export default function RadarView() {
     if (!formData.symbol) return;
     setIsFetchingInfo(true);
     try {
-      let symbolToSearch = formData.symbol;
+      let symbolToSearch = formData.symbol.trim();
       
       // ISIN Detection: 12 chars, starts with 2 letters
       const isISIN = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/i.test(symbolToSearch);
