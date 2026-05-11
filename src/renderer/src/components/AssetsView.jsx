@@ -82,6 +82,7 @@ export default function AssetsView() {
         sold: 0,
         pureInvested: 0,
         pureSold: 0,
+        totalPurchasedShares: 0,
         history: [] 
       }
     }
@@ -104,6 +105,7 @@ export default function AssetsView() {
       if (mult > 0) {
         a.invested += val
         a.pureInvested += (sharesNum * (t.unitPrice || 0))
+        a.totalPurchasedShares += sharesNum
       } else {
         a.sold += val
         a.pureSold += (sharesNum * (t.unitPrice || 0))
@@ -140,6 +142,7 @@ export default function AssetsView() {
     // Enhance asset object with calculated metrics
     a.currentValue = currentValue
     a.netCost = netCost
+    a.avgPrice = a.totalPurchasedShares > 0 ? (a.invested / a.totalPurchasedShares) : 0
     a.profit = currentValue - netCost
     a.profitPct = netCost > 1 ? (a.profit / netCost) * 100 : 0
     a.ytdProfit = a.profit 
@@ -549,7 +552,17 @@ export default function AssetsView() {
                     )}
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{isFixed ? `${a.yield}% ${a.type === 'Inmobiliario' ? 'Total' : 'Anual'}` : formatNumber(a.shares)}</div>
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{isFixed ? 'Rentabilidad pactada' : 'Participaciones'}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
+                        {isFixed ? 'Rentabilidad pactada' : (
+                          <>
+                            {!isFixed && a.avgPrice > 0 && (
+                              <div style={{ color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>
+                                Precio Medio: {formatCurrency(a.avgPrice)}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                       <div style={{ fontSize: 13, fontWeight: 500 }}>{formatCurrency(a.netCost)}</div>

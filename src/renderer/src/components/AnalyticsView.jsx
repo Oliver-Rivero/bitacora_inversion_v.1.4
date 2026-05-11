@@ -4,12 +4,52 @@ import {
   Calendar, TrendingUp, TrendingDown, Wallet, 
   Search, PieChart as PieChartIcon, ArrowUpDown,
   Activity, Target, Trophy, Edit3, Save, Info, ArrowRight,
-  ShieldCheck, Globe, Sparkles, AlertTriangle, Zap, Briefcase
+  ShieldCheck, Globe, Sparkles, AlertTriangle, Zap, Briefcase,
+  Eye, EyeOff
 } from 'lucide-react';
 import { 
   ResponsiveContainer, Tooltip as RechartsTooltip, Cell,
-  PieChart, Pie
+  PieChart, Pie, BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  AreaChart, Area
 } from 'recharts';
+import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
+import { scaleLinear } from 'd3-scale';
+import worldData from '../assets/world-map.json';
+
+const geoUrl = worldData;
+
+const CONTINENT_MAPS = {
+  "Europa": ["Albania", "Andorra", "Austria", "Belarus", "Belgium", "Bosnia and Herz.", "Bulgaria", "Croatia", "Cyprus", "Czechia", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Iceland", "Ireland", "Italy", "Kosovo", "Latvia", "Liechtenstein", "Lithuania", "Luxembourg", "Malta", "Moldova", "Monaco", "Montenegro", "Netherlands", "North Macedonia", "Norway", "Poland", "Portugal", "Romania", "Russia", "San Marino", "Serbia", "Slovakia", "Slovenia", "Spain", "Sweden", "Switzerland", "Ukraine", "United Kingdom", "Vatican City"],
+  "Asia": ["Afghanistan", "Armenia", "Azerbaijan", "Bahrain", "Bangladesh", "Bhutan", "Brunei", "Cambodia", "China", "Cyprus", "Georgia", "India", "Indonesia", "Iran", "Iraq", "Israel", "Japan", "Jordan", "Kazakhstan", "Kuwait", "Kyrgyzstan", "Laos", "Lebanon", "Malaysia", "Maldives", "Mongolia", "Myanmar", "Nepal", "North Korea", "Oman", "Pakistan", "Palestine", "Philippines", "Qatar", "Saudi Arabia", "Singapore", "South Korea", "Sri Lanka", "Syria", "Taiwan", "Tajikistan", "Thailand", "Timor-Leste", "Turkey", "Turkmenistan", "United Arab Emirates", "Uzbekistan", "Vietnam", "Yemen"]
+};
+
+const COUNTRY_MAP = {
+  "Estados Unidos": "United States of America",
+  "EEUU": "United States of America",
+  "USA": "United States of America",
+  "España": "Spain",
+  "Reino Unido": "United Kingdom",
+  "UK": "United Kingdom",
+  "Francia": "France",
+  "Alemania": "Germany",
+  "China": "China",
+  "Japón": "Japan",
+  "Canadá": "Canada",
+  "Suiza": "Switzerland",
+  "Países Bajos": "Netherlands",
+  "Holanda": "Netherlands",
+  "India": "India",
+  "Brasil": "Brazil",
+  "México": "Mexico",
+  "Australia": "Australia",
+  "Corea del Sur": "South Korea",
+  "Taiwán": "Taiwan",
+  "Italia": "Italy",
+  "Irlanda": "Ireland",
+  "Luxemburgo": "Luxembourg",
+  "Bélgica": "Belgium",
+  "Portugal": "Portugal"
+};
 
 const styles = `
   .tool-tab {
@@ -92,10 +132,10 @@ const styles = `
 export default function AnalyticsView() {
   const { 
     transactions, formatCurrency, formatNumber, formatPercent, loading, 
-    userProfile, updateProfile, quotes, fxRate, categories, assetTypes 
+    userProfile, updateProfile, quotes, fxRate, categories, assetTypes, snapshots
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals' | 'diversification'
+  const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals' | 'diversification' | 'evolution'
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
   const [viewMode, setViewMode] = useState('monthly');
@@ -108,6 +148,96 @@ export default function AnalyticsView() {
     years.add(new Date().getFullYear().toString());
     return Array.from(years).sort().reverse();
   }, [transactions]);
+
+  const [visibleComponents, setVisibleComponents] = useState({
+    base: true,
+    savings: true,
+    performance: true
+  });
+
+  // Cálculo del Valor de Cartera en Tiempo Real para la gráfica
+  const liveNetWorth = useMemo(() => {
+    let total = 0;
+    const entityAssetMap = {};
+    
+    transactions.forEach(t => {
+      if (t.operation === 'Intereses' || t.operation === 'Dividendos') return;
+      const sym = (t.symbol || t.name || '').toUpperCase();
+      const key = `${t.entityId}_${sym}`;
+      if (!entityAssetMap[key]) entityAssetMap[key] = { shares: 0, invested: 0, sold: 0 };
+      const mult = (t.operation === 'Venta' || t.operation === 'Retirada') ? -1 : 1;
+      entityAssetMap[key].shares += (t.shares || 0) * mult;
+      if (mult > 0) entityAssetMap[key].invested += t.total || 0;
+      else entityAssetMap[key].sold += t.total || 0;
+    });
+
+    Object.entries(entityAssetMap).forEach(([key, data]) => {
+      const sym = key.split('_')[1];
+      const q = quotes[sym];
+      const livePrice = q ? (q.currency === 'USD' ? (q.price / (fxRate || 1.1)) : q.price) : null;
+      total += (sym && livePrice) ? (data.shares * livePrice) : (data.invested - data.sold);
+    });
+    return total;
+  }, [transactions, quotes, fxRate]);
+
+  const periodGrowthData = useMemo(() => {
+    let units = [];
+    if (viewMode === 'annual') {
+      units = Array.from({ length: 12 }, (_, i) => {
+        const m = (i + 1).toString().padStart(2, '0');
+        return `${selectedYear}-${m}`;
+      });
+    } else {
+      const daysInMonth = new Date(selectedYear, Number(selectedMonth), 0).getDate();
+      units = Array.from({ length: daysInMonth }, (_, i) => {
+        const d = (i + 1).toString().padStart(2, '0');
+        return `${selectedYear}-${selectedMonth}-${d}`;
+      });
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const startOfPeriod = units[0];
+    const preSnaps = snapshots.filter(s => s.date < startOfPeriod).sort((a,b) => b.date.localeCompare(a.date));
+    const initialBase = preSnaps.length > 0 ? Number(preSnaps[0].netWorth) : Number(userProfile?.annualInitialCapital || userProfile?.baselineValue || 0);
+
+    let lastKnownTotal = initialBase;
+
+    return units.map((unit, idx) => {
+      const unitSnaps = snapshots.filter(s => s.date && s.date.startsWith(unit)).sort((a,b) => b.date.localeCompare(a.date));
+      let endValue = unitSnaps.length > 0 ? Number(unitSnaps[0].netWorth) : 0;
+      const isCurrentUnit = todayStr.startsWith(unit);
+      if (isCurrentUnit) endValue = Math.max(endValue, liveNetWorth);
+      if (endValue === 0) endValue = lastKnownTotal;
+      lastKnownTotal = endValue;
+
+      const txnsUntilNow = transactions.filter(t => t.date && t.date >= startOfPeriod && t.date <= (unit.length === 7 ? `${unit}-31` : unit));
+      const totalSavingsInPeriod = txnsUntilNow.reduce((acc, t) => {
+        const val = Math.abs(Number(t.total) || 0);
+        if (['Compra', 'Depósito', 'Aportación', 'Saldo Inicial'].includes(t.operation)) return acc + val;
+        if (['Venta', 'Retiro', 'Retirada'].includes(t.operation)) return acc - val;
+        return acc;
+      }, 0);
+
+      const performance = endValue - initialBase - totalSavingsInPeriod;
+
+      return {
+        label: viewMode === 'annual' ? new Date(unit + '-01').toLocaleDateString('es-ES', { month: 'short' }) : unit.split('-')[2],
+        base: initialBase,
+        savings: totalSavingsInPeriod,
+        performance: performance,
+        total: endValue,
+        unit
+      };
+    }).filter(d => {
+      if (d.unit > todayStr && d.unit.length > 7) return false;
+      return true;
+    });
+
+  }, [snapshots, transactions, userProfile, liveNetWorth, viewMode, selectedYear, selectedMonth]);
+
+  const toggleComponent = (comp) => {
+    setVisibleComponents(prev => ({ ...prev, [comp]: !prev[comp] }));
+  };
 
   const periodData = useMemo(() => {
     if (!transactions) return { totalIn: 0, totalOut: 0, yieldsOut: 0, totalReturns: 0, netFlow: 0, items: [], distribution: [] };
@@ -189,6 +319,12 @@ export default function AnalyticsView() {
             <ArrowUpDown size={16} /> Flujo de Caja
           </button>
           <button 
+            className={`tool-tab ${activeTab === 'evolution' ? 'active' : ''}`}
+            onClick={() => setActiveTab('evolution')}
+          >
+            <TrendingUp size={16} /> Evolución
+          </button>
+          <button 
             className={`tool-tab ${activeTab === 'goals' ? 'active' : ''}`}
             onClick={() => setActiveTab('goals')}
           >
@@ -228,7 +364,7 @@ export default function AnalyticsView() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 40 }}>
             <div className="glass-panel metric-card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12, fontWeight: 800, letterSpacing: 1.5 }}>Capital Inyectado</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12, fontWeight: 800, letterSpacing: 1.5 }}>Aportaciones Netas</div>
               <div style={{ fontSize: 36, fontWeight: 900, color: 'var(--success)' }}>{formatCurrency(periodData.totalIn)}</div>
               <TrendingUp size={48} style={{ position: 'absolute', bottom: 16, right: 16, opacity: 0.1, color: 'var(--success)' }} />
             </div>
@@ -327,9 +463,7 @@ export default function AnalyticsView() {
                         const isIn = ['Compra', 'Depósito', 'Aportación', 'Saldo Inicial'].includes(t.operation);
                         const isOut = ['Venta', 'Retiro', 'Retirada'].includes(t.operation);
                         const isYield = ['Dividendos', 'Intereses'].includes(t.operation);
-                        
                         const formattedDate = t.date ? t.date.split('-').reverse().join('-') : '-';
-                        
                         return (
                           <tr key={i} style={{ background: 'rgba(126, 145, 177, 0.04)', transition: 'background 0.2s' }} className="table-row-hover">
                             <td style={{ padding: '16px 12px', fontSize: 13, borderTopLeftRadius: 12, borderBottomLeftRadius: 12, color: 'var(--text-main)', fontWeight: 500 }}>{formattedDate}</td>
@@ -352,6 +486,19 @@ export default function AnalyticsView() {
             </div>
           </div>
         </>
+      ) : activeTab === 'evolution' ? (
+        <EvolutionAnalysis 
+          snapshots={snapshots} 
+          transactions={transactions} 
+          userProfile={userProfile}
+          formatCurrency={formatCurrency}
+          formatNumber={formatNumber}
+          liveNetWorth={liveNetWorth}
+          quotes={quotes}
+          fxRate={fxRate}
+          isPrivate={isPrivate}
+          setIsPrivate={setIsPrivate}
+        />
       ) : activeTab === 'goals' ? (
         <GoalsAnalysis 
           transactions={transactions} 
@@ -368,6 +515,271 @@ export default function AnalyticsView() {
       ) : (
         <AIIntelligence />
       )}
+    </div>
+  );
+}
+
+function EvolutionAnalysis({ snapshots, transactions, userProfile, formatCurrency, formatNumber, liveNetWorth, quotes, fxRate }) {
+  const { isPrivate, setIsPrivate } = useData();
+  const [visibleComponents, setVisibleComponents] = useState({ base: true, savings: true, performance: true });
+  
+  const yearlyEvolution = useMemo(() => {
+    // Datos históricos externos (Reto aceptado)
+    const LEGACY_DATA = [
+      { year: "2024", base: 34817.11, savings: 1767.17, performance: 2200.00, total: 38784.28 },
+      { year: "2025", base: 38784.28, savings: 18774.48, performance: 1835.15, total: 59393.91 }
+    ];
+
+    if (!snapshots) return LEGACY_DATA;
+    
+    const years = [...new Set(snapshots.map(s => s.date.split('-')[0]))]
+      .filter(y => !LEGACY_DATA.some(ld => ld.year === y)) // Evitar duplicados con legacy
+      .sort();
+      
+    const currentYearStr = new Date().getFullYear().toString();
+    if (!years.includes(currentYearStr) && !LEGACY_DATA.some(ld => ld.year === currentYearStr)) years.push(currentYearStr);
+
+    const calculatedData = years.map(year => {
+      const isCurrentYear = year === currentYearStr;
+      const yearSnaps = snapshots.filter(s => s.date.startsWith(year)).sort((a,b) => b.date.localeCompare(a.date));
+      let endNW = Number(yearSnaps[0]?.netWorth || 0);
+      if (isCurrentYear) endNW = Math.max(endNW, liveNetWorth);
+      
+      const prevYearSnaps = snapshots.filter(s => s.date < `${year}-01-01`).sort((a,b) => b.date.localeCompare(a.date));
+      
+      // Si el año anterior está en LEGACY, usamos su total como base
+      const legacyPrev = LEGACY_DATA.find(ld => ld.year === (Number(year) - 1).toString());
+      const startNW = legacyPrev 
+        ? legacyPrev.total 
+        : (prevYearSnaps.length > 0 
+            ? Number(prevYearSnaps[0].netWorth) 
+            : Number(userProfile?.annualInitialCapital || userProfile?.baselineValue || 0));
+      
+      const yearTxns = transactions.filter(t => t.date.startsWith(year));
+      const netSavings = yearTxns.reduce((acc, t) => {
+        const val = Number(t.total || 0);
+        const op = (t.operation || '').toLowerCase();
+        if (['compra', 'depósito', 'aportación', 'entrada', 'ingreso'].includes(op)) return acc + val;
+        if (['venta', 'retiro', 'retirada', 'salida', 'liquidación'].includes(op)) return acc - val;
+        if (op === 'saldo inicial' && prevYearSnaps.length === 0 && !userProfile?.annualInitialCapital) return acc + val;
+        return acc;
+      }, 0);
+      
+      const performance = endNW - (startNW + netSavings);
+      
+      let finalBase = startNW;
+      let finalSavings = netSavings;
+      let finalPerformance = performance;
+
+      // Sincronización para 2026 (Evitar inconsistencias con Objetivos)
+      if (isCurrentYear) {
+        // Usamos el capital inicial configurado por el usuario para este año como base real
+        const configuredBase = Number(userProfile?.baselineValue || userProfile?.annualInitialCapital || startNW);
+        finalBase = configuredBase;
+        // El rendimiento real es lo que falta para llegar al total restando base y ahorros
+        finalPerformance = liveNetWorth - (configuredBase + netSavings);
+      }
+
+      if (finalSavings < 0) {
+        finalBase = Math.max(0, finalBase + finalSavings);
+        finalSavings = 0;
+      }
+      
+      return {
+        year,
+        base: finalBase,
+        savings: finalSavings,
+        performance: finalPerformance,
+        total: endNW
+      };
+    });
+
+    return [...LEGACY_DATA, ...calculatedData].sort((a,b) => a.year.localeCompare(b.year));
+  }, [snapshots, transactions, userProfile, liveNetWorth]);
+
+  const evolutionData = useMemo(() => {
+    let totalInvested = 0;
+    const typeMap = {};
+
+    transactions.forEach(t => {
+      const amt = Number(t.total || 0);
+      const op = (t.operation || '').toLowerCase();
+      const isAdd = ['compra', 'depósito', 'aportación', 'entrada', 'ingreso', 'saldo inicial'].includes(op);
+      const isSub = ['venta', 'retiro', 'retirada', 'salida', 'liquidación'].includes(op);
+      
+      if (isAdd || isSub) {
+        const mult = isAdd ? 1 : -1;
+        totalInvested += amt * mult;
+        
+        const type = t.assetType || 'Otros';
+        const sym = (t.symbol || t.name || '').toUpperCase();
+        if (!typeMap[type]) typeMap[type] = { name: type, invested: 0, currentVal: 0, assets: {} };
+        typeMap[type].invested += amt * mult;
+        
+        if (sym) {
+          if (!typeMap[type].assets[sym]) typeMap[type].assets[sym] = { shares: 0, invested: 0 };
+          typeMap[type].assets[sym].shares += (t.shares || 0) * mult;
+          typeMap[type].assets[sym].invested += amt * mult;
+        }
+      }
+    });
+
+    Object.values(typeMap).forEach(type => {
+      Object.entries(type.assets).forEach(([sym, data]) => {
+        const q = quotes[sym];
+        const livePrice = q ? (q.currency === 'USD' ? (q.price / (fxRate || 1.1)) : q.price) : null;
+        type.currentVal += (livePrice && data.shares > 0) ? (data.shares * livePrice) : Math.max(0, data.invested);
+      });
+    });
+
+    const assetList = Object.values(typeMap).sort((a,b) => b.currentVal - a.currentVal);
+    const firstDate = transactions.length > 0 ? new Date(transactions.sort((a,b) => a.date.localeCompare(b.date))[0].date) : new Date();
+    const yearsInv = Math.max(0.01, (new Date() - firstDate) / (1000 * 60 * 60 * 24 * 365.25));
+    
+    let performancePct = 0;
+    let performanceLabel = "Rentabilidad Total";
+    
+    if (totalInvested > 0) {
+      if (yearsInv >= 1) {
+        performancePct = ((liveNetWorth / totalInvested) ** (1 / yearsInv) - 1) * 100;
+        performanceLabel = "Rentabilidad CAGR";
+      } else {
+        performancePct = ((liveNetWorth - totalInvested) / totalInvested) * 100;
+        performanceLabel = "Rentabilidad Total";
+      }
+    }
+
+    return { totalInvested, assetList, performancePct, performanceLabel };
+  }, [transactions, liveNetWorth, quotes, fxRate]);
+
+  return (
+    <div className="wizard-slide-enter" style={{ display: 'grid', gap: 24 }}>
+      {/* Tarjetas Superiores */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 20 }}>
+        <div className="glass-panel" style={{ padding: 20, background: 'linear-gradient(135deg, var(--accent), #005bb7)', color: 'white' }}>
+          <div style={{ fontSize: 10, opacity: 0.8, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Patrimonio Actual</div>
+          <div style={{ fontSize: 24, fontWeight: 900, filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s ease' }}>{formatCurrency(liveNetWorth)}</div>
+        </div>
+        <div className="glass-panel" style={{ padding: 20 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Inversión Neta Total</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text-main)', filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s ease' }}>{formatCurrency(evolutionData.totalInvested)}</div>
+        </div>
+        <div className="glass-panel" style={{ padding: 20 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Plusvalía Absoluta</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: (liveNetWorth - evolutionData.totalInvested) >= 0 ? '#10B981' : '#B48484', filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s ease' }}>
+            {formatCurrency(liveNetWorth - evolutionData.totalInvested)}
+          </div>
+        </div>
+        <div className="glass-panel" style={{ padding: 20 }}>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>{evolutionData.performanceLabel}</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--accent)', filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s ease' }}>{evolutionData.performancePct.toFixed(2)}%</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: 24 }}>
+        {/* Gráfica de Componentes */}
+        <div className="glass-panel" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, fontSize: 16, fontWeight: 800 }}>
+            <Calendar size={20} className="text-accent" /> Crecimiento Histórico
+          </h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24, fontWeight: 500 }}>Desglose anual de capital y rendimiento.</p>
+          <div style={{ flex: 1, minHeight: 350 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={yearlyEvolution} margin={{ top: 10, right: 10, left: 0, bottom: 0 }} barSize={50} barGap={0}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(126, 145, 177, 0.05)" />
+                <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 11, fontWeight: 700 }} dy={10} />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: 'var(--text-muted)', fontSize: 10, fontWeight: 600 }} tickFormatter={(v) => `${formatNumber(v/1000)}k`} />
+                <RechartsTooltip 
+                  cursor={{ fill: 'rgba(126, 145, 177, 0.05)' }}
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div style={{ background: 'var(--panel-bg)', backdropFilter: 'blur(10px)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: 'var(--glass-shadow)', padding: 16, minWidth: 200 }}>
+                          <div style={{ fontWeight: 800, fontSize: 14, marginBottom: 12, borderBottom: '1px solid var(--border)', paddingBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Año {label}</span>
+                            <span style={{ opacity: 0.5 }}>{isPrivate ? '••••' : formatCurrency(payload[0].payload.total)}</span>
+                          </div>
+                          {payload.map((entry, idx) => (
+                            <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6, gap: 16 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: entry.color }} />
+                                <span style={{ color: 'var(--text-muted)', fontSize: 11, fontWeight: 600 }}>{entry.name}</span>
+                              </div>
+                              <span style={{ fontWeight: 800, fontSize: 12, color: 'var(--text-main)', filter: isPrivate ? 'blur(4px)' : 'none' }}>{isPrivate ? '••••' : formatCurrency(entry.value)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
+                />
+                <Bar hide={!visibleComponents.base} dataKey="base" name="Base" stackId="a" fill="#F1F5F9" radius={[0, 0, 0, 0]} />
+                <Bar hide={!visibleComponents.savings} dataKey="savings" name="Aportaciones" stackId="a" fill="#7E91B1" radius={[0, 0, 0, 0]} />
+                <Bar hide={!visibleComponents.performance} dataKey="performance" name="Rentabilidad" stackId="a" radius={[10, 10, 0, 0]}>
+                  {yearlyEvolution.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.performance >= 0 ? '#8C9C8C' : '#B48484'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <div style={{ display: 'flex', gap: 20, marginTop: 24, justifyContent: 'center' }}>
+            <div onClick={() => setVisibleComponents(p=>({...p, base: !p.base}))} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer', opacity: visibleComponents.base ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: '#F1F5F9' }} /> Base
+            </div>
+            <div onClick={() => setVisibleComponents(p=>({...p, savings: !p.savings}))} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer', opacity: visibleComponents.savings ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: '#7E91B1' }} /> Aportaciones
+            </div>
+            <div onClick={() => setVisibleComponents(p=>({...p, performance: !p.performance}))} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', cursor: 'pointer', opacity: visibleComponents.performance ? 1 : 0.4, transition: 'opacity 0.2s' }}>
+              <div style={{ width: 10, height: 10, borderRadius: 3, background: '#8C9C8C' }} /> Rentabilidad
+            </div>
+          </div>
+        </div>
+
+        {/* Tabla de Desglose por Tipo de Activo */}
+        <div className="glass-panel" style={{ padding: 24, display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4, fontSize: 16, fontWeight: 800 }}>
+            <ShieldCheck size={20} className="text-accent" /> Activos por Tipo
+          </h3>
+          <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24, fontWeight: 500 }}>Inversión vs Mercado.</p>
+          
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 4px' }}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: 'left', padding: '0 8px 8px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>Tipo</th>
+                  <th style={{ textAlign: 'right', padding: '0 8px 8px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>Valor Actual</th>
+                  <th style={{ textAlign: 'right', padding: '0 8px 8px', fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 800 }}>%</th>
+                </tr>
+              </thead>
+              <tbody>
+                {evolutionData.assetList.map((asset, i) => {
+                  const profit = asset.currentVal - asset.invested;
+                  const weight = (asset.currentVal / (liveNetWorth || 1)) * 100;
+                  return (
+                    <tr key={i} style={{ background: 'rgba(126, 145, 177, 0.04)' }}>
+                      <td style={{ padding: '12px 8px', fontSize: 12, fontWeight: 800, borderTopLeftRadius: 8, borderBottomLeftRadius: 8 }}>{asset.name}</td>
+                      <td style={{ padding: '12px 8px', textAlign: 'right' }}>
+                        <div style={{ fontSize: 13, fontWeight: 900, filter: isPrivate ? 'blur(6px)' : 'none' }}>{formatCurrency(asset.currentVal)}</div>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: profit >= 0 ? '#8C9C8C' : '#B48484', filter: isPrivate ? 'blur(4px)' : 'none' }}>
+                          {profit >= 0 ? '+' : ''}{formatCurrency(profit)}
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 8px', textAlign: 'right', borderTopRightRadius: 8, borderBottomRightRadius: 8 }}>
+                        <div style={{ fontSize: 12, fontWeight: 800 }}>{weight.toFixed(1)}%</div>
+                        <div style={{ width: 40, height: 3, background: 'rgba(126, 145, 177, 0.1)', borderRadius: 2, overflow: 'hidden', marginLeft: 'auto', marginTop: 4 }}>
+                          <div style={{ width: `${weight}%`, height: '100%', background: 'var(--accent)' }} />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -867,15 +1279,69 @@ function HealthAnalysis() {
           <h3 style={{ fontSize: 14, fontWeight: 800, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
             <Globe size={18} className="text-accent" /> Geografía
           </h3>
-          <div style={{ height: 180, marginBottom: 20 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={healthData.countryData} innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value" stroke="none">
-                  {healthData.countryData.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-                <RechartsTooltip formatter={(v) => formatCurrency(v)} />
-              </PieChart>
-            </ResponsiveContainer>
+          <div style={{ height: 200, marginBottom: 20, position: 'relative', background: 'rgba(126, 145, 177, 0.02)', borderRadius: 16, overflow: 'hidden' }}>
+            {healthData.countryData.length > 0 ? (
+              <ComposableMap
+                projectionConfig={{ 
+                  scale: 140,
+                  center: [0, 20] 
+                }}
+                width={800}
+                height={400}
+                style={{ width: "100%", height: "100%" }}
+              >
+                <Geographies geography={geoUrl}>
+                  {({ geographies }) =>
+                    geographies.map((geo) => {
+                      const countryName = geo.properties.name;
+                      
+                      // 1. Prioridad: Datos por país específico
+                      const dCountry = healthData.countryData.find(c => 
+                        COUNTRY_MAP[c.name] === countryName || c.name === countryName
+                      );
+
+                      // 2. Segunda prioridad: Datos por continente
+                      const dContinent = healthData.countryData.find(c => {
+                        for (const [contName, countries] of Object.entries(CONTINENT_MAPS)) {
+                          if (c.name === contName && countries.includes(countryName)) return true;
+                        }
+                        return false;
+                      });
+
+                      // 3. Tercera prioridad: Mundial
+                      const dGlobal = healthData.countryData.find(c => c.name === 'Mundial' || c.name === 'Global');
+                      
+                      let fillColor = "rgba(126, 145, 177, 0.1)"; // Default
+                      if (dCountry) fillColor = dCountry.color;
+                      else if (dContinent) fillColor = dContinent.color;
+                      else if (dGlobal) fillColor = dGlobal.color;
+                      
+                      return (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill={fillColor}
+                          stroke="var(--panel-bg)"
+                          strokeWidth={0.5}
+                          style={{
+                            default: { outline: "none" },
+                            hover: { fill: dCountry || dContinent || dGlobal ? fillColor : "rgba(126, 145, 177, 0.3)", outline: "none", cursor: 'pointer' },
+                            pressed: { outline: "none" }
+                          }}
+                        />
+                      );
+                    })
+                  }
+                </Geographies>
+              </ComposableMap>
+            ) : (
+              <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                <Globe size={40} style={{ opacity: 0.2 }} />
+              </div>
+            )}
+            <div style={{ position: 'absolute', bottom: 8, right: 12, fontSize: 8, color: 'var(--text-muted)', opacity: 0.5 }}>
+               Visualización Geográfica Interactiva
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, overflowY: 'auto', maxHeight: 250, paddingRight: 4 }}>
              {healthData.countryData.map(d => (
@@ -964,4 +1430,5 @@ function HealthAnalysis() {
     </div>
   );
 }
+
 

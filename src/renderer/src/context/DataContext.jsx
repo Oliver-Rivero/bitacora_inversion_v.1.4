@@ -25,8 +25,11 @@ export function DataProvider({ children }) {
     { id: 'gas', label: 'Gasolina Anual Pagada', target: 1440, type: 'passive' },
     { id: 'rent', label: 'Alquiler Anual Pagado', target: 12000, type: 'passive' }
   ])
+  const [isPrivate, setIsPrivate] = useState(false)
   
   const formatCurrency = (value, currency = 'EUR') => {
+    if (isPrivate) return `•••• ${currency === 'EUR' ? '€' : (currency === 'BTC' ? 'BTC' : '$')}`
+    
     const num = Number(value)
     if (isNaN(num)) return '0,00 ' + (currency === 'EUR' ? '€' : (currency === 'BTC' ? 'BTC' : '$'))
     
@@ -47,6 +50,7 @@ export function DataProvider({ children }) {
   }
 
   const formatNumber = (value) => {
+    if (isPrivate) return '••••'
     const num = Number(value)
     if (isNaN(num)) return '0,00'
     return new Intl.NumberFormat('es-ES', {
@@ -205,6 +209,8 @@ export function DataProvider({ children }) {
   }
 
   const value = {
+    isPrivate,
+    setIsPrivate,
     entities,
     transactions,
     categories,

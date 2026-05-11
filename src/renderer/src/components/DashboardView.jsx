@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react'
 import { useData } from '../context/DataContext'
-import { RefreshCw, Calendar, Info } from 'lucide-react'
+import { RefreshCw, Calendar, Info, Eye, EyeOff } from 'lucide-react'
 import { 
   PieChart, Pie, Cell, Tooltip as RechartsTooltip, ResponsiveContainer, 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LabelList, Line, ReferenceLine,
@@ -40,7 +40,7 @@ const CustomTooltip = ({ active, payload, formatCurrency, formatNumber, formatPe
 export default function DashboardView() {
   const { 
     transactions, quotes, entities, loading, refreshPrices, fxRate, formatCurrency, formatNumber, formatPercent,
-    categories, assetTypes, userProfile, snapshots, takeSnapshot
+    categories, assetTypes, userProfile, snapshots, takeSnapshot, isPrivate, setIsPrivate
   } = useData()
   
   const [chartPeriod, setChartPeriod] = useState('ALL')
@@ -224,20 +224,29 @@ export default function DashboardView() {
     let pts = snapshots.map(s => ({
       date: s.date, costBasis: s.costBasis, totalValue: s.costBasis + s.unrealizedGain
     })).sort((a, b) => a.date.localeCompare(b.date))
+    
     if (transactions.length > 0) {
       const firstDate = sortedTxns[0].date
-      if (pts.length === 0 || pts[0].date !== firstDate) pts = [{ date: firstDate, costBasis: 0, totalValue: 0 }, ...pts]
-      if (pts.length === 1 || pts[pts.length-1].date !== 'Hoy') pts.push({ date: 'Hoy', costBasis: currentPortfolioCostBasis, totalValue: netWorth })
+      if (pts.length === 0 || pts[0].date > firstDate) {
+        pts = [{ date: firstDate, costBasis: 0, totalValue: 0 }, ...pts]
+      }
+      const todayStr = new Date().toISOString().split('T')[0]
+      if (pts.length > 0 && pts[pts.length-1].date !== todayStr && pts[pts.length-1].date !== 'Hoy') {
+        pts.push({ date: 'Hoy', costBasis: currentPortfolioCostBasis, totalValue: netWorth })
+      }
     }
+
+    const now = new Date()
     if (chartPeriod === '1Y') {
-      const dateLimit = new Date(); dateLimit.setFullYear(dateLimit.getFullYear() - 1);
-      const limitStr = dateLimit.toISOString().split('T')[0];
+      const limit = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
+      const limitStr = limit.toISOString().split('T')[0]
       pts = pts.filter(p => p.date === 'Hoy' || p.date >= limitStr)
     } else if (chartPeriod === '1M') {
-      const dateLimit = new Date(); dateLimit.setMonth(dateLimit.getMonth() - 1);
-      const limitStr = dateLimit.toISOString().split('T')[0];
+      const limit = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
+      const limitStr = limit.toISOString().split('T')[0]
       pts = pts.filter(p => p.date === 'Hoy' || p.date >= limitStr)
     }
+    
     return pts
   }, [snapshots, transactions, netWorth, currentPortfolioCostBasis, chartPeriod])
 
@@ -259,30 +268,36 @@ export default function DashboardView() {
     <div style={{ animation: 'fadeUp 0.6s ease' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
         <h1>Panel de Control</h1>
-        <button className="btn btn-secondary" onClick={refreshPrices} disabled={loading}>
-          <RefreshCw size={16} className={loading ? 'spinning' : ''} />
-          {loading ? 'Actualizando...' : 'Actualizar Precios'}
-        </button>
+        <div style={{ display: 'flex', gap: 12 }}>
+          <button className="btn btn-secondary" onClick={() => setIsPrivate(!isPrivate)} title={isPrivate ? "Mostrar valores" : "Ocultar valores"}>
+            {isPrivate ? <Eye size={16} /> : <EyeOff size={16} />}
+            {isPrivate ? 'Mostrar' : 'Ocultar'}
+          </button>
+          <button className="btn btn-secondary" onClick={refreshPrices} disabled={loading}>
+            <RefreshCw size={16} className={loading ? 'spinning' : ''} />
+            {loading ? 'Actualizando...' : 'Actualizar Precios'}
+          </button>
+        </div>
       </div>
 
       <div className="metrics-grid">
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Valor de la Cartera</div>
-          <div className="metric-value metric-hero">{formatCurrency(netWorth)}</div>
+          <div className="metric-value metric-hero" style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>{formatCurrency(netWorth)}</div>
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Inversión Histórica</div>
-          <div className="metric-value">{formatCurrency(totalContributions)}</div>
+          <div className="metric-value" style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>{formatCurrency(totalContributions)}</div>
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Rendimiento Total</div>
-          <div className={`metric-value ${totalProfit >= 0 ? 'metric-positive' : 'metric-negative'}`}>
+          <div className={`metric-value ${totalProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
             {formatCurrency(totalProfit)} <span className="metric-percentage">({formatPercent(totalProfitPct)}%)</span>
           </div>
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Rendimiento (Año)</div>
-          <div className={`metric-value ${ytdProfit >= 0 ? 'metric-positive' : 'metric-negative'}`}>
+          <div className={`metric-value ${ytdProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
             {formatCurrency(ytdProfit)} <span className="metric-percentage">({formatPercent(ytdProfitPct)}%)</span>
           </div>
         </div>
@@ -408,7 +423,20 @@ export default function DashboardView() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tickFormatter={d => d === 'Hoy' ? d : new Date(d).toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit' })} />
+              <XAxis 
+                dataKey="date" 
+                fontSize={10} 
+                tickLine={false} 
+                axisLine={false} 
+                tickFormatter={d => {
+                  if (d === 'Hoy') return d;
+                  const dateObj = new Date(d);
+                  if (chartPeriod === '1M') {
+                    return dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                  }
+                  return dateObj.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit' });
+                }} 
+              />
               <YAxis fontSize={10} tickLine={false} axisLine={false} tickFormatter={v => `${formatNumber(v/1000)}k€`} />
               <RechartsTooltip content={<CustomTooltip formatCurrency={formatCurrency} formatNumber={formatNumber} formatPercent={formatPercent} />} />
               <Area type="monotone" dataKey="costBasis" name="Inversión" stroke="#7E91B1" fill="url(#colorCost)" strokeWidth={1.5} />
