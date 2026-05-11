@@ -132,7 +132,8 @@ const styles = `
 export default function AnalyticsView() {
   const { 
     transactions, formatCurrency, formatNumber, formatPercent, loading, 
-    userProfile, updateProfile, quotes, fxRate, categories, assetTypes, snapshots
+    userProfile, updateProfile, quotes, fxRate, categories, assetTypes, snapshots,
+    isPrivate, setIsPrivate
   } = useData();
 
   const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals' | 'diversification' | 'evolution'
