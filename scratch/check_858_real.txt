@@ -1,0 +1,8 @@
+¡Qué buena pregunta! Tras haber trabajado en las entrañas de la **Bitácora Inversión** y ver cómo ha evolucionado hoy, creo que tienes una base técnica y visual envidiable. 
+
+Sin embargo, para llevarla al siguiente nivel (nivel "Hedge Fund" personal), aquí te lanzo algunas ideas que me han ido rondando la cabeza mientras programaba:
+
+### 1. Mejoras Funcionales (Estratégicas)
+*   **Optimizador de Rebalanceo**: Una herramienta que, basada en tu "Cartera Ideal" (por ejemplo: 60% Acciones, 30% RF, 10% Cripto), te diga exactamente qué cantidad comprar o vender de cada activo para volver a tu objetivo. ¡Es la clave para comprar barato y vender caro de forma automática!
+*   **Calendario de Dividendos / Rentas**: Una vista donde puedas ver cuándo te toca cobrar (en base al histórico y proyecciones) y cuánto dinero "pasivo" generas cada mes. Podríamos añadir una métrica de **"Independencia Financiera"** (qué % de tus gastos mensuales cubren tus dividendos).
+<truncated 2076 bytes>

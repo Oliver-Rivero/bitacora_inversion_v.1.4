@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useData } from '../context/DataContext'
-import { Download, TrendingUp, History, FileSpreadsheet, FileJson, ArrowUpDown, PieChart } from 'lucide-react'
+import { Download, TrendingUp, History, FileSpreadsheet, FileJson, ArrowUpDown, PieChart, CheckCircle2 } from 'lucide-react'
 import { exportLibroMayorExcel, exportLibroMayorCSV, exportDetailedReportPDF } from '../utils/exportUtils'
 
 export default function ReportsView() {
@@ -329,6 +329,58 @@ export default function ReportsView() {
         }
       })
 
+      // --- Cálculo de Operaciones Cerradas (Posiciones liquidadas en el periodo) ---
+      const closedOpsMap = {}
+      const productsList = Array.from(new Set(sortedTxns.map(t => (t.symbol || t.name || 'Unknown').toUpperCase())))
+      
+      productsList.forEach(symbol => {
+        let sharesBefore = 0
+        let totalInvestedBefore = 0
+        let totalReceivedBefore = 0
+        
+        let sharesInPeriod = 0
+        let totalInvestedInPeriod = 0
+        let totalReceivedInPeriod = 0
+
+        sortedTxns.forEach(t => {
+          const s = (t.symbol || t.name || 'Unknown').toUpperCase()
+          if (s !== symbol) return
+          if (!['Compra', 'Venta', 'Saldo Inicial'].includes(t.operation)) return
+
+          const isVenta = t.operation === 'Venta'
+          const mult = isVenta ? -1 : 1
+          const amt = Math.abs(Number(t.total) || 0)
+
+          if (t.date < from) {
+            sharesBefore += (t.shares || 0) * mult
+            if (isVenta) totalReceivedBefore += amt
+            else totalInvestedBefore += amt
+          } else if (t.date <= to) {
+            sharesInPeriod += (t.shares || 0) * mult
+            if (isVenta) totalReceivedInPeriod += amt
+            else totalInvestedInPeriod += amt
+          }
+        })
+
+        const startShares = sharesBefore
+        const endShares = sharesBefore + sharesInPeriod
+
+        // Condición de Operación Cerrada: 
+        // 1. Teníamos acciones al inicio o compramos durante el periodo
+        // 2. Al final del periodo NO tenemos acciones (0)
+        // 3. Hubo al menos una venta en el periodo que cerró la posición
+        if (endShares < 0.000001 && (startShares > 0.000001 || totalInvestedInPeriod > 0)) {
+          // El resultado total de la operación es lo recibido menos lo invertido (en toda la vida del activo hasta el cierre)
+          const totalProfit = (totalReceivedBefore + totalReceivedInPeriod) - (totalInvestedBefore + totalInvestedInPeriod)
+          closedOpsMap[symbol] = {
+            symbol,
+            name: transactions.find(t => (t.symbol || t.name || '').toUpperCase() === symbol)?.name || symbol,
+            profit: totalProfit,
+            profitPct: (totalInvestedBefore + totalInvestedInPeriod) > 0 ? (totalProfit / (totalInvestedBefore + totalInvestedInPeriod)) * 100 : 0
+          }
+        }
+      })
+
       setAnnualReport({
         year: selectedYear,
         isCurrent: isCurrentYear,
@@ -339,7 +391,8 @@ export default function ReportsView() {
         outflows: totalOutflows,
         income: totalIncome,
         marketPerf: totalMarketPerformance,
-        assetStats: Object.values(assetStatsMap).filter(s => Math.abs(s.start) > 0.01 || Math.abs(s.end) > 0.01 || Math.abs(s.flows) > 0.01).sort((a,b) => b.end - a.end)
+        assetStats: Object.values(assetStatsMap).filter(s => Math.abs(s.start) > 0.01 || Math.abs(s.end) > 0.01 || Math.abs(s.flows) > 0.01).sort((a,b) => b.end - a.end),
+        closedOps: Object.values(closedOpsMap).sort((a,b) => b.profit - a.profit)
       })
 
     } catch (err) {
@@ -505,6 +558,48 @@ export default function ReportsView() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Operaciones Cerradas */}
+              {annualReport.closedOps && annualReport.closedOps.length > 0 && (
+                <div className="glass-panel" style={{ padding: 32, marginTop: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+                    <CheckCircle2 size={20} color="var(--success)" />
+                    <h3 style={{ fontSize: 13, fontWeight: 800, textTransform: 'uppercase', margin: 0, color: 'var(--text-muted)', letterSpacing: 1 }}>Operaciones Cerradas en {annualReport.year}</h3>
+                  </div>
+                  <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>Activos cuya posición ha sido liquidada completamente durante el periodo.</p>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Activo</th>
+                        <th style={{ textAlign: 'right' }}>Resultado Realizado</th>
+                        <th style={{ textAlign: 'right' }}>Rentabilidad</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {annualReport.closedOps.map(op => (
+                        <tr key={op.symbol}>
+                          <td style={{ padding: '14px 0' }}>
+                            <div style={{ fontWeight: 700, fontSize: 13 }}>{op.name}</div>
+                            <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>{op.symbol}</div>
+                          </td>
+                          <td style={{ padding: '14px 0', textAlign: 'right', fontWeight: 800, color: op.profit >= 0 ? 'var(--success)' : 'var(--danger)', fontSize: 14 }}>
+                            {op.profit >= 0 ? '+' : ''}{formatCurrency(op.profit)}
+                          </td>
+                          <td style={{ padding: '14px 0', textAlign: 'right' }}>
+                            <span style={{ 
+                              padding: '4px 8px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+                              background: op.profit >= 0 ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                              color: op.profit >= 0 ? 'var(--success)' : 'var(--danger)'
+                            }}>
+                              {op.profit >= 0 ? '+' : ''}{formatPercent(op.profitPct)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

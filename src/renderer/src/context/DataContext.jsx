@@ -26,6 +26,7 @@ export function DataProvider({ children }) {
     { id: 'rent', label: 'Alquiler Anual Pagado', target: 12000, type: 'passive' }
   ])
   const [isPrivate, setIsPrivate] = useState(false)
+  const [showTutorial, setShowTutorial] = useState(false)
   
   const formatCurrency = (value, currency = 'EUR') => {
     if (isPrivate) return `•••• ${currency === 'EUR' ? '€' : (currency === 'BTC' ? 'BTC' : '$')}`
@@ -92,6 +93,11 @@ export function DataProvider({ children }) {
         const savedMilestones = await window.api.getConfig('user_milestones');
         if (savedMilestones) {
           setMilestones(JSON.parse(savedMilestones));
+        }
+
+        const hasSeenTutorial = await window.api.getConfig('has_seen_tutorial');
+        if (!hasSeenTutorial) {
+          setShowTutorial(true);
         }
       } catch (e) {
         console.warn('Config load failed:', e);
@@ -211,6 +217,8 @@ export function DataProvider({ children }) {
   const value = {
     isPrivate,
     setIsPrivate,
+    showTutorial,
+    setShowTutorial,
     entities,
     transactions,
     categories,

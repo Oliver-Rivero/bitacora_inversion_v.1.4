@@ -102,7 +102,7 @@ export default function ProjectionSection({ totalData, evolutionTimeline, format
                   type="number" 
                   value={capitalVal} 
                   onChange={e => setCapitalVal(e.target.value)}
-                  style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 16 }}
+                  style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text-main)', fontSize: 16 }}
                 />
               </div>
               <div>
@@ -111,7 +111,7 @@ export default function ProjectionSection({ totalData, evolutionTimeline, format
                   type="number" 
                   value={savingsVal} 
                   onChange={e => setSavingsVal(e.target.value)}
-                  style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 16 }}
+                  style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text-main)', fontSize: 16 }}
                 />
               </div>
               <div>
@@ -120,7 +120,7 @@ export default function ProjectionSection({ totalData, evolutionTimeline, format
                   type="number" 
                   value={yieldVal} 
                   onChange={e => setYieldVal(e.target.value)}
-                  style={{ width: '100%', padding: '12px 16px', background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text)', fontSize: 16 }}
+                  style={{ width: '100%', padding: '12px 16px', background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 12, color: 'var(--text-main)', fontSize: 16 }}
                 />
               </div>
             </div>
@@ -136,9 +136,9 @@ export default function ProjectionSection({ totalData, evolutionTimeline, format
           </div>
           <div style={{ display: 'grid', gap: 16 }}>
             {milestones.map(m => (
-              <div key={m.year} className="glass-panel" style={{ padding: '16px 20px', background: 'rgba(255,255,255,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div key={m.year} className="glass-panel" style={{ padding: '16px 20px', background: 'var(--bg-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>En {m.year} años</span>
-                <span style={{ fontSize: 18, fontWeight: 700 }}>{formatCurrency(m.value)}</span>
+                <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--text-main)' }}>{formatCurrency(m.value)}</span>
               </div>
             ))}
           </div>

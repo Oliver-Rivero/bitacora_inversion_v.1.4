@@ -431,7 +431,7 @@ export default function LedgerView() {
                 </div>
               </div>
 
-              <div style={{ gridColumn: 'span 2', background: 'rgba(0,0,0,0.015)', padding: 20, borderRadius: 16, border: '1px solid rgba(0,0,0,0.05)' }}>
+              <div style={{ gridColumn: 'span 2', background: 'var(--bg-subtle)', padding: 20, borderRadius: 16, border: '1px solid var(--border-subtle)', opacity: 0.8 }}>
                 <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 16, display: 'block', color: 'var(--text-muted)' }}>
                   Detalles del Activo
                 </label>
@@ -521,7 +521,7 @@ export default function LedgerView() {
                           )}
 
                           {formData.name && (
-                            <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginTop: 10, padding: 15, background: 'rgba(0,0,0,0.02)', borderRadius: 12 }}>
+                            <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginTop: 10, padding: 15, background: 'var(--bg-subtle)', borderRadius: 12 }}>
                               <label style={{ gridColumn: 'span 2', fontSize: 10, color: 'var(--text-muted)' }}>PASO 2: DETALLES DE LA OPERACIÓN</label>
                               
                               {isDividend ? (

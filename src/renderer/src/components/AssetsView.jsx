@@ -468,7 +468,7 @@ export default function AssetsView() {
         <div style={{ overflowX: 'auto' }}>
           <table className="data-table" style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr style={{ background: 'rgba(0,0,0,0.02)' }}>
+              <tr style={{ background: 'var(--bg-subtle)' }}>
                 <th style={{ textAlign: 'left', padding: '16px 20px', fontSize: 11 }}>ACTIVO</th>
                 {displayedAssets.some(a => ['Depósitos', 'Bonos/Letras', 'Inmobiliario', 'Capital Privado'].includes(a.type)) && (
                   <th style={{ textAlign: 'left', padding: '16px 20px', fontSize: 11 }}>ESTADO / PROGRESO</th>
@@ -539,7 +539,7 @@ export default function AssetsView() {
                                 {progress > 0 && progress < 100 ? progress.toFixed(2) : Math.round(progress)}%
                               </span>
                             </div>
-                            <div style={{ height: 4, background: 'rgba(0,0,0,0.05)', borderRadius: 2, overflow: 'hidden' }}>
+                            <div style={{ height: 4, background: 'var(--bg-subtle)', borderRadius: 2, overflow: 'hidden' }}>
                               <div style={{ width: `${progress}%`, height: '100%', background: color }} />
                             </div>
                           </div>

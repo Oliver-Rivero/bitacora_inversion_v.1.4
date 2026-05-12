@@ -1,6 +1,6 @@
 {
   "name": "mi-cartera",
-  "version": "1.8.0-beta",
+  "version": "1.9.0-beta",
   "description": "Aplicación de gestión de cartera de inversión",
   "main": "./out/main/index.js",
   "scripts": {

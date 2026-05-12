@@ -43,7 +43,10 @@ export default function DashboardView() {
     categories, assetTypes, userProfile, snapshots, takeSnapshot, isPrivate, setIsPrivate
   } = useData()
   
-  const [chartPeriod, setChartPeriod] = useState('ALL')
+  // Estado Global de Filtrado para Gráficas
+  const [globalPeriod, setGlobalPeriod] = useState('ALL') // ALL, 1Y, 1M
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [hoveredMacro, setHoveredMacro] = useState(null)
 
   // --- Metrics Calculation ---
@@ -169,7 +172,7 @@ export default function DashboardView() {
   }
   const ytdProfitPct = lastYearSnapshot ? ((ytdProfit / (totalContributions - ytdAportacionesTotal)) * 100) : totalProfitPct
 
-  const totalRealizedPeriod = ytdIncomeTotal + ytdRealizedGains
+
 
   // --- Snapshot Logic ---
   useEffect(() => {
@@ -237,18 +240,20 @@ export default function DashboardView() {
     }
 
     const now = new Date()
-    if (chartPeriod === '1Y') {
-      const limit = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())
-      const limitStr = limit.toISOString().split('T')[0]
-      pts = pts.filter(p => p.date === 'Hoy' || p.date >= limitStr)
-    } else if (chartPeriod === '1M') {
-      const limit = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate())
-      const limitStr = limit.toISOString().split('T')[0]
-      pts = pts.filter(p => p.date === 'Hoy' || p.date >= limitStr)
+    if (globalPeriod === '1Y') {
+      pts = pts.filter(p => {
+        if (p.date === 'Hoy') return new Date().getFullYear() === selectedYear
+        return new Date(p.date).getFullYear() === selectedYear
+      })
+    } else if (globalPeriod === '1M') {
+      pts = pts.filter(p => {
+        const date = p.date === 'Hoy' ? new Date() : new Date(p.date)
+        return date.getFullYear() === selectedYear && date.getMonth() === selectedMonth
+      })
     }
     
     return pts
-  }, [snapshots, transactions, netWorth, currentPortfolioCostBasis, chartPeriod])
+  }, [snapshots, transactions, netWorth, currentPortfolioCostBasis, globalPeriod, selectedYear, selectedMonth])
 
   const nestedMacroData = Object.values(macroAllocationMap).map(m => ({
     ...m,
@@ -260,20 +265,47 @@ export default function DashboardView() {
     name: entities.find(e => e.id == v.id)?.name || '?', value: v.value, percentRef: (v.value / netWorth) * 100
   })).sort((a,b) => b.value - a.value)
 
-  const intDivHistoryData = Object.values(intDivHistoryMap).sort((a,b) => a.date.localeCompare(b.date))
+  // Filtrado de historial de intereses/dividendos según periodo seleccionado
+  const filteredIntDivData = useMemo(() => {
+    let data = Object.values(intDivHistoryMap)
+    
+    if (globalPeriod === '1Y') {
+      data = data.filter(d => new Date(d.date).getFullYear() === selectedYear)
+    } else if (globalPeriod === '1M') {
+      data = data.filter(d => {
+        const date = new Date(d.date)
+        return date.getFullYear() === selectedYear && date.getMonth() === selectedMonth
+      })
+    }
+    
+    return data.sort((a, b) => a.date.localeCompare(b.date))
+  }, [intDivHistoryMap, globalPeriod, selectedYear, selectedMonth])
+
+  const totalRealizedPeriod = useMemo(() => {
+    return filteredIntDivData.reduce((acc, curr) => acc + curr.dividends + curr.interests, 0)
+  }, [filteredIntDivData])
+
+  const intDivHistoryData = filteredIntDivData // Mantener compatibilidad de nombre si se usa abajo
 
   const ENTITY_DEFAULT_COLORS = ['#A7C7E7', '#C1E1C1', '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C5CBE3', '#E0BBE4']
 
   return (
     <div style={{ animation: 'fadeUp 0.6s ease' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <h1>Panel de Control</h1>
         <div style={{ display: 'flex', gap: 12 }}>
           <button className="btn btn-secondary" onClick={() => setIsPrivate(!isPrivate)} title={isPrivate ? "Mostrar valores" : "Ocultar valores"}>
             {isPrivate ? <Eye size={16} /> : <EyeOff size={16} />}
             {isPrivate ? 'Mostrar' : 'Ocultar'}
           </button>
-          <button className="btn btn-secondary" onClick={refreshPrices} disabled={loading}>
+          <button 
+            className="btn btn-secondary" 
+            onClick={() => {
+              refreshPrices()
+              if (window.addToast) window.addToast('Actualizando precios de mercado...', 'info')
+            }} 
+            disabled={loading}
+          >
             <RefreshCw size={16} className={loading ? 'spinning' : ''} />
             {loading ? 'Actualizando...' : 'Actualizar Precios'}
           </button>
@@ -283,30 +315,38 @@ export default function DashboardView() {
       <div className="metrics-grid">
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Valor de la Cartera</div>
-          <div className="metric-value metric-hero" style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>{formatCurrency(netWorth)}</div>
+          {loading ? <div className="skeleton" style={{ height: 34, width: '80%', marginTop: 8 }} /> : (
+            <div className="metric-value metric-hero" style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>{formatCurrency(netWorth)}</div>
+          )}
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Inversión Histórica</div>
-          <div className="metric-value" style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>{formatCurrency(totalContributions)}</div>
+          {loading ? <div className="skeleton" style={{ height: 34, width: '70%', marginTop: 8 }} /> : (
+            <div className="metric-value" style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>{formatCurrency(totalContributions)}</div>
+          )}
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Rendimiento Total</div>
-          <div className={`metric-value ${totalProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
-            {formatCurrency(totalProfit)} <span className="metric-percentage">({formatPercent(totalProfitPct)}%)</span>
-          </div>
+          {loading ? <div className="skeleton" style={{ height: 34, width: '90%', marginTop: 8 }} /> : (
+            <div className={`metric-value ${totalProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
+              {formatCurrency(totalProfit)} <span className="metric-percentage">({formatPercent(totalProfitPct)}%)</span>
+            </div>
+          )}
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Rendimiento (Año)</div>
-          <div className={`metric-value ${ytdProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
-            {formatCurrency(ytdProfit)} <span className="metric-percentage">({formatPercent(ytdProfitPct)}%)</span>
-          </div>
+          {loading ? <div className="skeleton" style={{ height: 34, width: '60%', marginTop: 8 }} /> : (
+            <div className={`metric-value ${ytdProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
+              {formatCurrency(ytdProfit)} <span className="metric-percentage">({formatPercent(ytdProfitPct)}%)</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="charts-grid" style={{ marginTop: 24, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
-        <div className="glass-panel" style={{ padding: '24px 28px', minHeight: 400 }}>
-          <h3 style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700, opacity: 0.8 }}>DISTRIBUCIÓN DE PATRIMONIO</h3>
-          <div style={{ display: 'flex', height: 28, width: '100%', background: 'rgba(0,0,0,0.05)', borderRadius: 14, overflow: 'hidden', marginBottom: 32, cursor: 'pointer' }}>
+      <div className="charts-grid" style={{ marginTop: 20, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+        <div className="glass-panel" style={{ padding: '20px 24px', minHeight: 340 }}>
+          <h3 style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 16, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700, opacity: 0.8 }}>DISTRIBUCIÓN DE PATRIMONIO</h3>
+          <div style={{ display: 'flex', height: 24, width: '100%', background: 'var(--bg-subtle)', borderRadius: 12, overflow: 'hidden', marginBottom: 24, cursor: 'pointer' }}>
             {nestedMacroData.map(m => (
               <div 
                 key={m.name} 
@@ -329,9 +369,9 @@ export default function DashboardView() {
                 style={{ 
                   display: 'flex', flexDirection: 'column',
                   padding: hoveredMacro === m.name ? '14px' : '6px',
-                  background: hoveredMacro === m.name ? 'rgba(0,0,0,0.02)' : 'transparent',
+                  background: hoveredMacro === m.name ? 'var(--bg-subtle)' : 'transparent',
                   borderRadius: 16,
-                  border: hoveredMacro === m.name ? '1px solid rgba(0,0,0,0.06)' : '1px solid transparent',
+                  border: hoveredMacro === m.name ? '1px solid var(--border-subtle)' : '1px solid transparent',
                   opacity: (hoveredMacro && hoveredMacro !== m.name) ? 0.4 : 1,
                   transition: 'all 0.3s ease',
                   zIndex: hoveredMacro === m.name ? 10 : 1,
@@ -348,10 +388,10 @@ export default function DashboardView() {
                 </div>
                 
                 {hoveredMacro === m.name && (
-                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', gap: 5, animation: 'fadeIn 0.2s ease' }}>
+                  <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: 5, animation: 'fadeIn 0.2s ease' }}>
                     {m.assets.sort((a,b) => b.value - a.value).map(asset => (
                       <div key={asset.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, gap: 8 }}>
-                        <span style={{ color: 'rgba(0,0,0,0.5)' }}>{asset.name}</span>
+                        <span style={{ color: 'var(--text-muted)' }}>{asset.name}</span>
                         <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{formatPercent((asset.value / m.value) * 100)}%</span>
                       </div>
                     ))}
@@ -362,9 +402,9 @@ export default function DashboardView() {
           </div>
         </div>
 
-        <div className="glass-panel" style={{ padding: 24, minHeight: 400 }}>
-          <h3 style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 24, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700, opacity: 0.8 }}>DISTRIBUCIÓN POR ENTIDAD</h3>
-          <ResponsiveContainer width="100%" height={300}>
+        <div className="glass-panel" style={{ padding: 20, minHeight: 340 }}>
+          <h3 style={{ fontSize: 11, color: 'var(--text-muted)', marginBottom: 20, textTransform: 'uppercase', letterSpacing: '0.8px', fontWeight: 700, opacity: 0.8 }}>DISTRIBUCIÓN POR ENTIDAD</h3>
+          <ResponsiveContainer width="100%" height={260}>
             <BarChart data={entityPieData} layout="vertical">
               <XAxis type="number" hide />
               <YAxis dataKey="name" type="category" width={100} fontSize={11} axisLine={false} tickLine={false} />
@@ -380,11 +420,16 @@ export default function DashboardView() {
         </div>
       </div>
 
-      <div style={{ marginTop: 24, display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 24 }}>
-        <div className="glass-panel" style={{ padding: 24, height: 400 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-            <h3 style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0, letterSpacing: '0.8px' }}>EVOLUCIÓN DEL PATRIMONIO NETO</h3>
-            <div className="glass-panel" style={{ display: 'flex', padding: 3, borderRadius: 10, background: 'rgba(0,0,0,0.03)' }}>
+      {/* Bloque Unificado de Análisis de Rendimiento */}
+      <div className="glass-panel" style={{ marginTop: 20, padding: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, paddingBottom: 16, borderBottom: '1px solid var(--border-subtle)' }}>
+          <div>
+            <h3 style={{ fontSize: 12, fontWeight: 800, color: 'var(--text-main)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>Análisis de Rendimiento</h3>
+            <p style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>Control global de periodo para evolución y flujos de caja</p>
+          </div>
+          
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+            <div className="glass-panel" style={{ display: 'flex', padding: 3, borderRadius: 10, background: 'var(--bg-subtle)' }}>
               {[
                 { id: 'ALL', label: 'Total' },
                 { id: '1Y', label: 'Anual' },
@@ -392,82 +437,110 @@ export default function DashboardView() {
               ].map(p => (
                 <button
                   key={p.id}
-                  onClick={() => setChartPeriod(p.id)}
-                  className={clsx('btn-toggle', chartPeriod === p.id && 'active')}
+                  onClick={() => setGlobalPeriod(p.id)}
+                  className={clsx('btn-toggle', globalPeriod === p.id && 'active')}
                   style={{
                     padding: '6px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none',
-                    background: chartPeriod === p.id ? '#7E91B1' : 'transparent',
-                    color: chartPeriod === p.id ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
+                    background: globalPeriod === p.id ? '#7E91B1' : 'transparent',
+                    color: globalPeriod === p.id ? '#fff' : 'var(--text-muted)', cursor: 'pointer'
                   }}
                 >
                   {p.label}
                 </button>
               ))}
             </div>
+
+            {globalPeriod !== 'ALL' && (
+              <select 
+                value={selectedYear} 
+                onChange={e => setSelectedYear(Number(e.target.value))}
+                style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, padding: '6px 12px', width: 90, color: 'var(--text-main)', outline: 'none' }}
+              >
+                {[2024, 2025, 2026].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            )}
+
+            {globalPeriod === '1M' && (
+              <select 
+                value={selectedMonth} 
+                onChange={e => setSelectedMonth(Number(e.target.value))}
+                style={{ background: 'var(--bg-subtle)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 11, padding: '6px 12px', width: 110, color: 'var(--text-main)', outline: 'none' }}
+              >
+                {['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'].map((m, i) => (
+                  <option key={m} value={i}>{m}</option>
+                ))}
+              </select>
+            )}
           </div>
-          <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#7E91B1' }} />
-              <span style={{ color: 'var(--text-muted)' }}>Capital Invertido</span>
-            </div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11 }}>
-              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#65A30D' }} />
-              <span style={{ color: 'var(--text-muted)' }}>Beneficios (Intereses/Div.)</span>
-            </div>
-          </div>
-          <ResponsiveContainer width="100%" height="75%">
-            <ComposedChart data={chartData}>
-              <defs>
-                <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#7E91B1" stopOpacity={0.15}/><stop offset="95%" stopColor="#7E91B1" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-              <XAxis 
-                dataKey="date" 
-                fontSize={10} 
-                tickLine={false} 
-                axisLine={false} 
-                tickFormatter={d => {
-                  if (d === 'Hoy') return d;
-                  const dateObj = new Date(d);
-                  if (chartPeriod === '1M') {
-                    return dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
-                  }
-                  return dateObj.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit' });
-                }} 
-              />
-              <YAxis fontSize={10} tickLine={false} axisLine={false} tickFormatter={v => `${formatNumber(v/1000)}k€`} />
-              <RechartsTooltip content={<CustomTooltip formatCurrency={formatCurrency} formatNumber={formatNumber} formatPercent={formatPercent} />} />
-              <Area type="monotone" dataKey="costBasis" name="Inversión" stroke="#7E91B1" fill="url(#colorCost)" strokeWidth={1.5} />
-              <Line type="monotone" dataKey="totalValue" name="Valor" stroke="#65A30D" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 0 }} />
-            </ComposedChart>
-          </ResponsiveContainer>
         </div>
 
-        <div className="glass-panel" style={{ padding: 24, height: 400 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-            <h3 style={{ fontSize: 12, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0, letterSpacing: '0.8px' }}>RESULTADOS REALIZADOS (CAJA)</h3>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Plusvalías Totales</div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--success)' }}>+{formatCurrency(totalRealizedPeriod)}</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1fr', gap: 20 }}>
+          {/* Gráfica de Evolución */}
+          <div className="glass-panel" style={{ padding: 16, height: 320, background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)' }}>
+            <h4 style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12, letterSpacing: '0.8px' }}>Evolución del Patrimonio</h4>
+            <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#7E91B1' }} />
+                <span style={{ color: 'var(--text-muted)' }}>Capital Invertido</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#65A30D' }} />
+                <span style={{ color: 'var(--text-muted)' }}>Valor de Mercado</span>
+              </div>
             </div>
+            <ResponsiveContainer width="100%" height="75%">
+              <ComposedChart data={chartData}>
+                <defs>
+                  <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#7E91B1" stopOpacity={0.15}/><stop offset="95%" stopColor="#7E91B1" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis 
+                  dataKey="date" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={d => {
+                    if (d === 'Hoy') return d;
+                    const dateObj = new Date(d);
+                    if (globalPeriod === '1M') return dateObj.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+                    return dateObj.toLocaleDateString('es-ES', { year: 'numeric', month: '2-digit' });
+                  }} 
+                />
+                <YAxis fontSize={10} tickLine={false} axisLine={false} tickFormatter={v => `${formatNumber(v/1000)}k€`} />
+                <RechartsTooltip content={<CustomTooltip formatCurrency={formatCurrency} formatNumber={formatNumber} formatPercent={formatPercent} />} />
+                <Area type="monotone" dataKey="costBasis" name="Inversión" stroke="#7E91B1" fill="url(#colorCost)" strokeWidth={1.5} />
+                <Line type="monotone" dataKey="totalValue" name="Valor" stroke="#65A30D" strokeWidth={2} strokeDasharray="4 4" dot={{ r: 0 }} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
-          <ResponsiveContainer width="100%" height="75%">
-            <BarChart data={intDivHistoryData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-              <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tickFormatter={d => new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} />
-              <YAxis fontSize={10} tickLine={false} axisLine={false} />
-              <Legend verticalAlign="top" align="center" iconType="circle" wrapperStyle={{ fontSize: 11, paddingBottom: 24 }} />
-              <RechartsTooltip 
-                formatter={(v, name) => [formatCurrency(v), name === 'gain' ? 'Plusvalías Ventas' : name === 'dividends' ? 'Dividendos' : 'Intereses']}
-                contentStyle={{ borderRadius: 12, border: 'none', boxShadow: 'var(--glass-shadow)' }} 
-              />
-              <Bar dataKey="dividends" name="Dividendos" fill="#9CAF9C" stackId="a" />
-              <Bar dataKey="interests" name="Intereses" fill="#D9CD96" stackId="a" />
-              <Bar dataKey="gain" name="Plusvalías Ventas" fill="#A29BBD" stackId="a" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+
+          {/* Gráfica de Resultados */}
+          <div className="glass-panel" style={{ padding: 16, height: 320, background: 'rgba(255, 255, 255, 0.03)', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+              <h4 style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', margin: 0, letterSpacing: '0.8px' }}>Resultados Realizados</h4>
+              <div style={{ textAlign: 'right' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Beneficio Periodo</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--success)' }}>+{formatCurrency(totalRealizedPeriod)}</div>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height="70%">
+              <BarChart data={intDivHistoryData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tickFormatter={d => new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} />
+                <YAxis fontSize={10} tickLine={false} axisLine={false} />
+                <Legend verticalAlign="top" align="center" iconType="circle" wrapperStyle={{ fontSize: 11, paddingBottom: 24 }} />
+                <RechartsTooltip 
+                  formatter={(v, name) => [formatCurrency(v), name === 'gain' ? 'Plusvalías Ventas' : name === 'dividends' ? 'Dividendos' : 'Intereses']}
+                  contentStyle={{ borderRadius: 12, border: 'none', boxShadow: 'var(--glass-shadow)' }} 
+                />
+                <Bar dataKey="dividends" name="Dividendos" fill="#9CAF9C" stackId="a" />
+                <Bar dataKey="interests" name="Intereses" fill="#D9CD96" stackId="a" />
+                <Bar dataKey="gain" name="Plusvalías Ventas" fill="#A29BBD" stackId="a" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>
