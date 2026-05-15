@@ -80,9 +80,10 @@ export default function DashboardView() {
       totalInterestDividends += t.total
       if (isCurrentYear) {
         ytdIncomeTotal += t.total
-        if (!intDivHistoryMap[t.date]) intDivHistoryMap[t.date] = { date: t.date, dividends: 0, interests: 0, gain: 0 }
-        if (t.operation === 'Dividendos') intDivHistoryMap[t.date].dividends += t.total
-        else intDivHistoryMap[t.date].interests += t.total
+        const monthKey = t.date.substring(0, 7)
+        if (!intDivHistoryMap[monthKey]) intDivHistoryMap[monthKey] = { date: monthKey, dividends: 0, interests: 0, gain: 0 }
+        if (t.operation === 'Dividendos') intDivHistoryMap[monthKey].dividends += t.total
+        else intDivHistoryMap[monthKey].interests += t.total
       }
       return
     }
@@ -113,8 +114,9 @@ export default function DashboardView() {
           }
         }
         const saleGain = t.total - costBasisTotal
-        if (!intDivHistoryMap[t.date]) intDivHistoryMap[t.date] = { date: t.date, dividends: 0, interests: 0, gain: 0 }
-        intDivHistoryMap[t.date].gain += saleGain
+        const monthKey = t.date.substring(0, 7)
+        if (!intDivHistoryMap[monthKey]) intDivHistoryMap[monthKey] = { date: monthKey, dividends: 0, interests: 0, gain: 0 }
+        intDivHistoryMap[monthKey].gain += saleGain
         totalRealizedGains += saleGain
         if (isCurrentYear) ytdRealizedGains += saleGain
       }
@@ -545,7 +547,17 @@ export default function DashboardView() {
             <ResponsiveContainer width="100%" height="70%">
               <BarChart data={intDivHistoryData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tickFormatter={d => new Date(d).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} />
+                <XAxis 
+                  dataKey="date" 
+                  fontSize={10} 
+                  tickLine={false} 
+                  axisLine={false} 
+                  tickFormatter={d => {
+                    const [year, month] = d.split('-')
+                    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+                    return `${months[parseInt(month)-1]} ${year.substring(2)}`
+                  }} 
+                />
                 <YAxis fontSize={10} tickLine={false} axisLine={false} />
                 <Legend verticalAlign="top" align="center" iconType="circle" wrapperStyle={{ fontSize: 11, paddingBottom: 24 }} />
                 <RechartsTooltip 

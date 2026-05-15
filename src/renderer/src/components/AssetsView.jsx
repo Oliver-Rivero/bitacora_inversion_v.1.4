@@ -83,7 +83,10 @@ export default function AssetsView() {
         pureInvested: 0,
         pureSold: 0,
         totalPurchasedShares: 0,
-        history: [] 
+        generatedIncome: 0, // Interests + Dividends
+        realizedGains: 0,   // Sale profits
+        history: [],
+        fifoQueue: [] 
       }
     }
 
@@ -106,9 +109,29 @@ export default function AssetsView() {
         a.invested += val
         a.pureInvested += (sharesNum * (t.unitPrice || 0))
         a.totalPurchasedShares += sharesNum
+        a.fifoQueue.push({ shares: sharesNum, cost: val })
       } else {
         a.sold += val
         a.pureSold += (sharesNum * (t.unitPrice || 0))
+        
+        // FIFO Gain Calculation
+        let sharesToSell = sharesNum
+        let costBasisForSale = 0
+        while (sharesToSell > 0.000001 && a.fifoQueue.length > 0) {
+          let lot = a.fifoQueue[0]
+          if (lot.shares <= sharesToSell) {
+            costBasisForSale += lot.cost
+            sharesToSell -= lot.shares
+            a.fifoQueue.shift()
+          } else {
+            const ratio = sharesToSell / lot.shares
+            costBasisForSale += lot.cost * ratio
+            lot.cost -= lot.cost * ratio
+            lot.shares -= sharesToSell
+            sharesToSell = 0
+          }
+        }
+        a.realizedGains += (val - costBasisForSale)
       }
       
       a.history.push({
@@ -117,6 +140,8 @@ export default function AssetsView() {
         value: val * mult,
         shares: a.shares
       })
+    } else if (t.operation === 'Intereses' || t.operation === 'Dividendos') {
+      a.generatedIncome += val
     }
   })
 
@@ -145,6 +170,7 @@ export default function AssetsView() {
     a.netCost = netCost
     a.avgPrice = a.totalPurchasedShares > 0 ? (a.invested / a.totalPurchasedShares) : 0
     a.profit = currentValue - netCost
+    a.totalCashFlow = a.generatedIncome + a.realizedGains
     a.profitPct = netCost > 1 ? (a.profit / netCost) * 100 : 0
     a.ytdProfit = a.profit 
     
@@ -178,9 +204,10 @@ export default function AssetsView() {
     acc.currentValue += a.currentValue
     acc.invested += a.netCost
     acc.profit += a.profit
+    acc.totalCashFlow += a.totalCashFlow
     acc.expectedProfitTotal += (a.expectedProfit || 0)
     return acc
-  }, { currentValue: 0, invested: 0, profit: 0, expectedProfitTotal: 0 })
+  }, { currentValue: 0, invested: 0, profit: 0, expectedProfitTotal: 0, totalCashFlow: 0 })
 
   const totalProfitPct = totals.invested > 1 ? (totals.profit / totals.invested) * 100 : 0
 
@@ -477,6 +504,7 @@ export default function AssetsView() {
                 <th style={{ textAlign: 'right', padding: '16px 20px', fontSize: 11 }}>PARTICIPACIONES / INF.</th>
                 <th style={{ textAlign: 'right', padding: '16px 20px', fontSize: 11 }}>INVERSIÓN NETA</th>
                 <th style={{ textAlign: 'right', padding: '16px 20px', fontSize: 11 }}>VALOR ACTUAL</th>
+                <th style={{ textAlign: 'right', padding: '16px 20px', fontSize: 11 }}>FLUJO CAJA</th>
                 <th style={{ textAlign: 'right', padding: '16px 20px', fontSize: 11 }}>RENTABILIDAD</th>
               </tr>
             </thead>
@@ -576,6 +604,15 @@ export default function AssetsView() {
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                       <div style={{ fontSize: 14, fontWeight: 700 }}>{formatCurrency(a.currentValue)}</div>
                       {isFixed && <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>Vence: {new Date(a.maturityDate).toLocaleDateString('es-ES')}</div>}
+                    </td>
+                    <td style={{ padding: '16px 20px', textAlign: 'right' }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: a.totalCashFlow > 0 ? 'var(--success)' : 'var(--text-muted)' }}>
+                        {formatCurrency(a.totalCashFlow)}
+                      </div>
+                      <div style={{ fontSize: 9, color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        {a.generatedIncome > 0 && <span>{a.type === 'Bonos/Letras' || a.type === 'Depósitos' ? 'Intereses' : 'Dividendos'}: {formatCurrency(a.generatedIncome)}</span>}
+                        {a.realizedGains !== 0 && <span>P. Venta: {formatCurrency(a.realizedGains)}</span>}
+                      </div>
                     </td>
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                       <div style={{ 
