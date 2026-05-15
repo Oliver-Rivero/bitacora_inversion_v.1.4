@@ -27,6 +27,8 @@ export function DataProvider({ children }) {
   ])
   const [isPrivate, setIsPrivate] = useState(false)
   const [showTutorial, setShowTutorial] = useState(false)
+  const [showAdvancedTutorial, setShowAdvancedTutorial] = useState(false)
+  const [globalAnalyticsTab, setGlobalAnalyticsTab] = useState('flow')
   
   const formatCurrency = (value, currency = 'EUR') => {
     if (isPrivate) return `•••• ${currency === 'EUR' ? '€' : (currency === 'BTC' ? 'BTC' : '$')}`
@@ -219,6 +221,10 @@ export function DataProvider({ children }) {
     setIsPrivate,
     showTutorial,
     setShowTutorial,
+    showAdvancedTutorial,
+    setShowAdvancedTutorial,
+    globalAnalyticsTab,
+    setGlobalAnalyticsTab,
     entities,
     transactions,
     categories,

@@ -14,6 +14,7 @@ import {
   CircleDollarSign,
   Filter,
   X,
+  Info,
   RefreshCcw,
   ArrowRightLeft
 } from 'lucide-react'
@@ -87,6 +88,9 @@ export default function LedgerView() {
     name: '',
     shares: '',
     unitPrice: '',
+    originalUnitPrice: '',
+    originalTotal: '',
+    exchangeRate: '1',
     currency: 'EUR',
     commission: '',
     tax: '',
@@ -113,7 +117,8 @@ export default function LedgerView() {
           setFormData(prev => ({ 
             ...prev, 
             name: quote.shortName || quote.longName || prev.name,
-            unitPrice: quote.regularMarketPrice || prev.unitPrice,
+            unitPrice: detectedCurrency === 'EUR' ? (quote.regularMarketPrice || prev.unitPrice) : prev.unitPrice,
+            originalUnitPrice: detectedCurrency !== 'EUR' ? (quote.regularMarketPrice || prev.originalUnitPrice) : prev.originalUnitPrice,
             currency: detectedCurrency === 'USD' ? 'USD' : prev.currency
           }))
         }
@@ -125,31 +130,63 @@ export default function LedgerView() {
     }
   }
 
+  // --- Auto FX Rate Fetching ---
+  React.useEffect(() => {
+    const fetchFX = async () => {
+      if (formData.currency !== 'EUR' && formData.date) {
+        const symbol = formData.currency === 'USD' ? 'EURUSD=X' : null
+        if (symbol) {
+          // Fix: The API expects (symbol, date) as separate arguments
+          const rate = await window.api?.getHistoricalPrice?.(symbol, formData.date)
+          if (rate) {
+            setFormData(prev => ({ ...prev, exchangeRate: Number(rate).toFixed(4) }))
+          }
+        }
+      } else {
+        setFormData(prev => ({ ...prev, exchangeRate: '1' }))
+      }
+    }
+    fetchFX()
+  }, [formData.date, formData.currency])
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     
     // Calculate total
     const sharesNum = parseFloat(formData.shares) || 1
-    const priceNum = parseFloat(formData.unitPrice) || 0
+    const currency = formData.currency || 'EUR'
+    const isEUR = currency === 'EUR'
+    
+    const originalPrice = parseFloat(isEUR ? formData.unitPrice : formData.originalUnitPrice) || 0
+    const fxRate = parseFloat(formData.exchangeRate) || 1
+    const priceInEUR = isEUR ? originalPrice : (originalPrice / fxRate)
+    
     const commNum = parseFloat(formData.commission) || 0
     const taxNum = parseFloat(formData.tax) || 0
 
-    let baseTotal = (sharesNum * priceNum)
+    let baseTotal = (sharesNum * priceInEUR)
     let finalTotal = 0
+    
+    // Calculate original total for reference
+    const origTotal = (sharesNum * originalPrice)
+
     if (formData.operation === 'Compra' || formData.operation === 'Saldo Inicial') {
       finalTotal = baseTotal + commNum + taxNum
     } else if (formData.operation === 'Venta') {
       finalTotal = baseTotal - commNum - taxNum
     } else if (formData.operation === 'Aportación' || formData.operation === 'Retirada') {
-      finalTotal = priceNum - commNum - taxNum;
+      finalTotal = priceInEUR - commNum - taxNum;
     } else {
-      finalTotal = priceNum - commNum - taxNum 
+      finalTotal = priceInEUR - commNum - taxNum 
     }
 
     const payload = {
       ...formData,
       shares: (formData.operation === 'Depósito' || formData.operation === 'Retiro') ? 0 : sharesNum,
-      unitPrice: priceNum,
+      unitPrice: priceInEUR,
+      originalUnitPrice: originalPrice,
+      originalTotal: origTotal,
+      exchangeRate: fxRate,
       commission: commNum,
       tax: taxNum,
       yield: parseFloat(formData.yield) || 0,
@@ -177,6 +214,9 @@ export default function LedgerView() {
       name: t.name || '',
       shares: t.shares,
       unitPrice: t.unitPrice,
+      originalUnitPrice: t.originalUnitPrice || t.unitPrice,
+      originalTotal: t.originalTotal || t.total,
+      exchangeRate: t.exchangeRate || '1',
       currency: t.currency || 'EUR',
       commission: t.commission,
       tax: t.tax,
@@ -249,7 +289,7 @@ export default function LedgerView() {
     if (formData.operation === 'Dividendos') {
       return new Set(['Acciones', "ETF's"]);
     }
-    if (formData.operation === 'Venta') {
+    if (formData.operation === 'Venta' || formData.operation === 'Intereses') {
       if (!formData.entityId) return null;
       const types = new Set();
       currentPositions.forEach(p => {
@@ -467,17 +507,17 @@ export default function LedgerView() {
                     
                     const showTicker = ['Acciones', "ETF's", 'Fondos Indexados', 'Cripto'].includes(formData.assetType);
                     
-                    if (isInterest || isCashFlow) {
+                    if (isCashFlow) {
                       return (
                         <>
-                          <input placeholder={isCashFlow ? "Concepto (ej: Aportación mensual)" : "Concepto (ej: Pago Trimestral)"} value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} required style={{ gridColumn: 'span 2' }} />
+                          <input placeholder="Concepto (ej: Aportación mensual)" value={formData.name || ''} onChange={e => setFormData({...formData, name: e.target.value})} required style={{ gridColumn: 'span 2' }} />
                           <input type="number" step="0.01" placeholder="Importe" value={formData.unitPrice || ''} onChange={e => setFormData({...formData, unitPrice: e.target.value})} required style={{ gridColumn: 'span 2' }} />
                         </>
                       );
                     }
                     
                     const isVenta = formData.operation === 'Venta';
-                    const isSmartFlow = isVenta || isDividend;
+                    const isSmartFlow = isVenta || isDividend || isInterest;
                     
                     if (isSmartFlow) {
                       const currentPos = (currentPositions || []).find(p => 
@@ -510,7 +550,7 @@ export default function LedgerView() {
                                 }}
                                 style={{ width: '100%', border: !formData.name ? '1px solid var(--accent)' : 'none' }}
                               >
-                                <option value="">{assetsOfSelectedType.length > 0 ? (isVenta ? '-- Elige qué quieres vender --' : '-- Elige qué activo paga el dividendo --') : '-- No hay posiciones registradas --'}</option>
+                                <option value="">{assetsOfSelectedType.length > 0 ? (isVenta ? '-- Elige qué quieres vender --' : (isDividend ? '-- Elige qué activo paga el dividendo --' : '-- Elige qué activo genera intereses --')) : '-- No hay posiciones registradas --'}</option>
                                 {assetsOfSelectedType.map(p => (
                                   <option key={`${p.entityId}_${p.symbol || p.name}`} value={p.symbol || p.name}>
                                     {p.name} {p.symbol ? `(${p.symbol})` : ''} {isVenta && `- (Disp: ${formatNumber(p.shares)})`}
@@ -524,10 +564,10 @@ export default function LedgerView() {
                             <div style={{ gridColumn: 'span 2', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px', marginTop: 10, padding: 15, background: 'var(--bg-subtle)', borderRadius: 12 }}>
                               <label style={{ gridColumn: 'span 2', fontSize: 10, color: 'var(--text-muted)' }}>PASO 2: DETALLES DE LA OPERACIÓN</label>
                               
-                              {isDividend ? (
+                              {isDividend || isInterest ? (
                                 <div style={{ gridColumn: 'span 2' }}>
-                                  <label style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 8 }}>Importe del Dividendo (Total)</label>
-                                  <input type="number" step="0.01" placeholder="Importe Dividendo" value={formData.unitPrice || ''} onChange={e => setFormData({...formData, unitPrice: e.target.value})} required style={{ width: '100%' }} />
+                                  <label style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 8 }}>Importe del {isDividend ? 'Dividendo' : 'Interés'} (Total)</label>
+                                  <input type="number" step="0.01" placeholder={isDividend ? "Importe Dividendo" : "Importe Interés"} value={formData.unitPrice || ''} onChange={e => setFormData({...formData, unitPrice: e.target.value})} required style={{ width: '100%' }} />
                                 </div>
                               ) : !isFixed ? (
                                 <>
@@ -620,7 +660,17 @@ export default function LedgerView() {
                             <div style={{ position: 'relative' }}>
                               <input type="number" step="0.000000001" placeholder="Participaciones / Cantidad" value={formData.shares || ''} onChange={e => setFormData({...formData, shares: e.target.value})} required style={{ width: '100%' }} />
                             </div>
-                            <input type="number" step="0.01" placeholder="Precio Unitario" value={formData.unitPrice || ''} onChange={e => setFormData({...formData, unitPrice: e.target.value})} required />
+                            <input 
+                              type="number" 
+                              step="0.01" 
+                              placeholder={formData.currency === 'EUR' ? "Precio Unitario (€)" : `Precio Unitario (${formData.currency})`} 
+                              value={formData.currency === 'EUR' ? formData.unitPrice : formData.originalUnitPrice} 
+                              onChange={e => setFormData({
+                                ...formData, 
+                                [formData.currency === 'EUR' ? 'unitPrice' : 'originalUnitPrice']: e.target.value
+                              })} 
+                              required 
+                            />
                           </>
                         ) : (
                           <>
@@ -675,6 +725,27 @@ export default function LedgerView() {
                     <option value="USD">Dólares ($)</option>
                     <option value="BTC">Bitcoin (BTC)</option>
                   </select>
+                  
+                  {formData.currency !== 'EUR' && (
+                    <div style={{ animation: 'fadeUp 0.3s ease', background: 'rgba(0,113,227,0.05)', padding: 12, borderRadius: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                       <label style={{ fontSize: 9, fontWeight: 700, color: 'var(--accent)' }}>TIPO DE CAMBIO (1€ = ? {formData.currency})</label>
+                       <input 
+                         type="number" 
+                         step="0.0001" 
+                         placeholder="Tipo de cambio" 
+                         value={formData.exchangeRate} 
+                         onChange={e => setFormData({...formData, exchangeRate: e.target.value})} 
+                       />
+                       <p style={{ fontSize: 9, color: 'var(--text-muted)', margin: 0 }}>
+                         {formData.originalUnitPrice ? `${formatCurrency(formData.originalUnitPrice, formData.currency)} ≈ ${formatCurrency(formData.originalUnitPrice / (formData.exchangeRate || 1), 'EUR')}` : 'Introduce el cambio del día'}
+                       </p>
+                       <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 4, color: 'var(--accent)', opacity: 0.8 }}>
+                         <Info size={10} />
+                         <span style={{ fontSize: 9, fontWeight: 600 }}>Revisa el tipo de cambio por si tu broker aplicó uno distinto</span>
+                       </div>
+                    </div>
+                  )}
+
                   <input type="number" step="0.01" placeholder="Comisiones (€)" value={formData.commission || ''} onChange={e => setFormData({...formData, commission: e.target.value})} />
                   <input type="number" step="0.01" placeholder="Impuestos (€)" value={formData.tax || ''} onChange={e => setFormData({...formData, tax: e.target.value})} />
                 </div>
@@ -741,7 +812,16 @@ export default function LedgerView() {
                       <div style={{ fontSize: 13 }}>{formatNumber(t.shares)}</div>
                     </td>
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                      <div style={{ fontSize: 13 }}>{formatCurrency(t.unitPrice, t.currency || 'EUR')}</div>
+                      <div style={{ fontSize: 13 }}>
+                        {t.currency && t.currency !== 'EUR' ? (
+                          <>
+                            <div style={{ fontWeight: 700 }}>{formatCurrency(t.originalUnitPrice, t.currency)}</div>
+                            <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>{formatCurrency(t.unitPrice, 'EUR')}</div>
+                          </>
+                        ) : (
+                          formatCurrency(t.unitPrice, 'EUR')
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '16px 20px', textAlign: 'right' }}>
                       <div style={{ fontSize: 14, fontWeight: 800, color: opColor }}>

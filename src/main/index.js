@@ -75,13 +75,13 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('db-add-transaction', (_, txn) => {
-    const { date, entityId, toEntityId, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, currency, yield: yld, maturityDate } = txn
+    const { date, entityId, toEntityId, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, originalUnitPrice, originalTotal, currency, yield: yld, maturityDate } = txn
     const stmt = db.prepare(`
       INSERT INTO transactions 
-      (date, entityId, toEntityId, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, currency, yield, maturityDate) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (date, entityId, toEntityId, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, originalUnitPrice, originalTotal, currency, yield, maturityDate) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
-    const info = stmt.run(date, entityId, toEntityId || null, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, currency || 'EUR', yld || 0, maturityDate || null)
+    const info = stmt.run(date, entityId, toEntityId || null, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, originalUnitPrice || null, originalTotal || null, currency || 'EUR', yld || 0, maturityDate || null)
     return info.lastInsertRowid
   })
 
@@ -92,13 +92,13 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('db-edit-transaction', (_, txn) => {
-    const { id, date, entityId, toEntityId, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, currency, yield: yld, maturityDate } = txn
+    const { id, date, entityId, toEntityId, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, originalUnitPrice, originalTotal, currency, yield: yld, maturityDate } = txn
     const stmt = db.prepare(`
       UPDATE transactions 
-      SET date = ?, entityId = ?, toEntityId = ?, operation = ?, assetType = ?, symbol = ?, name = ?, shares = ?, unitPrice = ?, exchangeRate = ?, commission = ?, tax = ?, total = ?, currency = ?, yield = ?, maturityDate = ?
+      SET date = ?, entityId = ?, toEntityId = ?, operation = ?, assetType = ?, symbol = ?, name = ?, shares = ?, unitPrice = ?, exchangeRate = ?, commission = ?, tax = ?, total = ?, originalUnitPrice = ?, originalTotal = ?, currency = ?, yield = ?, maturityDate = ?
       WHERE id = ?
     `)
-    stmt.run(date, entityId, toEntityId || null, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, currency || 'EUR', yld || 0, maturityDate || null, id)
+    stmt.run(date, entityId, toEntityId || null, operation, assetType, symbol, name, shares, unitPrice, exchangeRate, commission, tax, total, originalUnitPrice || null, originalTotal || null, currency || 'EUR', yld || 0, maturityDate || null, id)
     return true
   })
 

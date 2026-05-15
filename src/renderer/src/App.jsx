@@ -16,6 +16,7 @@ import EntitiesDetailView from './components/EntitiesDetailView'
 import ToolsView from './components/ToolsView'
 import RadarView from './components/RadarView'
 import OnboardingModal from './components/OnboardingModal'
+import AdvancedTutorial from './components/AdvancedTutorial'
 import { useData } from './context/DataContext'
 import logoLight from './assets/logo-light.png'
 import logoDark from './assets/logo-dark.png'
@@ -98,7 +99,7 @@ function CommandPalette({ isOpen, onClose, onSelect, items }) {
 }
 
 export default function App() {
-  const { setLedgerFormRequested, transactions, quotes, fxRate, loading, showTutorial } = useData()
+  const { setLedgerFormRequested, transactions, quotes, fxRate, loading, showTutorial, showAdvancedTutorial } = useData()
   const [activeTab, setActiveTab] = useState('dashboard')
   const [theme, setTheme] = useState('light')
   const [mood, setMood] = useState('neutral')
@@ -335,7 +336,7 @@ export default function App() {
             {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
           </div>
           <div style={{ padding: '8px 12px', fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>
-            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E8E' }}>beta 1.9</div>
+            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E8E' }}>beta 2.0</div>
           </div>
         </div>
       </div>
@@ -375,6 +376,7 @@ export default function App() {
 
       {/* Tutorial Interactivo */}
       {showTutorial && <OnboardingModal />}
+      {showAdvancedTutorial && <AdvancedTutorial setActiveTab={setActiveTab} />}
 
       <div className="toast-container">
         {toasts.map(t => (

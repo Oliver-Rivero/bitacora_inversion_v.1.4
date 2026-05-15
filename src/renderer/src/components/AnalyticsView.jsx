@@ -133,10 +133,9 @@ export default function AnalyticsView() {
   const { 
     transactions, formatCurrency, formatNumber, formatPercent, loading, 
     userProfile, updateProfile, quotes, fxRate, categories, assetTypes, snapshots,
-    isPrivate, setIsPrivate
+    isPrivate, setIsPrivate, globalAnalyticsTab, setGlobalAnalyticsTab
   } = useData();
 
-  const [activeTab, setActiveTab] = useState('flow'); // 'flow' | 'goals' | 'diversification' | 'evolution'
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
   const [viewMode, setViewMode] = useState('monthly');
@@ -312,35 +311,23 @@ export default function AnalyticsView() {
           <p style={{ color: 'var(--text-muted)', fontSize: 16, fontWeight: 500 }}>Control de flujos, rentabilidad y objetivos de inversión.</p>
         </div>
 
-        <div className="glass-panel" style={{ display: 'flex', padding: 6, borderRadius: 14, background: 'rgba(126, 145, 177, 0.05)' }}>
-          <button 
-            className={`tool-tab ${activeTab === 'flow' ? 'active' : ''}`}
-            onClick={() => setActiveTab('flow')}
-          >
-            <ArrowUpDown size={16} /> Flujo de Caja
+        <div className="tool-tabs" style={{ display: 'flex', gap: 10, background: 'rgba(126, 145, 177, 0.05)', padding: 6, borderRadius: 16 }}>
+          <button id="tutorial-analytics-flow" className={`tool-tab ${globalAnalyticsTab === 'flow' ? 'active' : ''}`} onClick={() => setGlobalAnalyticsTab('flow')}>
+            <Activity size={16} /> Aportaciones y Rendimientos
           </button>
-          <button 
-            className={`tool-tab ${activeTab === 'evolution' ? 'active' : ''}`}
-            onClick={() => setActiveTab('evolution')}
-          >
-            <TrendingUp size={16} /> Evolución
+          <button id="tutorial-analytics-evolution" className={`tool-tab ${globalAnalyticsTab === 'evolution' ? 'active' : ''}`} onClick={() => setGlobalAnalyticsTab('evolution')}>
+            <TrendingUp size={16} /> Evolución Histórica
           </button>
-          <button 
-            className={`tool-tab ${activeTab === 'goals' ? 'active' : ''}`}
-            onClick={() => setActiveTab('goals')}
-          >
+          <button id="tutorial-analytics-goals" className={`tool-tab ${globalAnalyticsTab === 'goals' ? 'active' : ''}`} onClick={() => setGlobalAnalyticsTab('goals')}>
             <Target size={16} /> Objetivos
           </button>
-          <button 
-            className={`tool-tab ${activeTab === 'diversification' ? 'active' : ''}`}
-            onClick={() => setActiveTab('diversification')}
-          >
-            <ShieldCheck size={16} /> Diversificación
+          <button id="tutorial-analytics-diversification" className={`tool-tab ${globalAnalyticsTab === 'diversification' ? 'active' : ''}`} onClick={() => setGlobalAnalyticsTab('diversification')}>
+            <PieChartIcon size={16} /> Diversificación
           </button>
         </div>
       </div>
 
-      {activeTab === 'flow' ? (
+      {globalAnalyticsTab === 'flow' && (
         <>
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
             <div className="glass-panel" style={{ display: 'flex', padding: 8, gap: 8, borderRadius: 16, boxShadow: 'var(--glass-shadow)' }}>
@@ -365,7 +352,7 @@ export default function AnalyticsView() {
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 24, marginBottom: 40 }}>
             <div className="glass-panel metric-card">
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12, fontWeight: 800, letterSpacing: 1.5 }}>Aportaciones Netas</div>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 12, fontWeight: 800, letterSpacing: 1.5 }}>Aportaciones Brutas</div>
               <div style={{ fontSize: 36, fontWeight: 900, color: 'var(--success)' }}>{formatCurrency(periodData.totalIn)}</div>
               <TrendingUp size={48} style={{ position: 'absolute', bottom: 16, right: 16, opacity: 0.1, color: 'var(--success)' }} />
             </div>
@@ -487,7 +474,9 @@ export default function AnalyticsView() {
             </div>
           </div>
         </>
-      ) : activeTab === 'evolution' ? (
+      )}
+
+      {globalAnalyticsTab === 'evolution' && (
         <EvolutionAnalysis 
           snapshots={snapshots} 
           transactions={transactions} 
@@ -500,7 +489,9 @@ export default function AnalyticsView() {
           isPrivate={isPrivate}
           setIsPrivate={setIsPrivate}
         />
-      ) : activeTab === 'goals' ? (
+      )}
+      
+      {globalAnalyticsTab === 'goals' && (
         <GoalsAnalysis 
           transactions={transactions} 
           userProfile={userProfile} 
@@ -511,10 +502,10 @@ export default function AnalyticsView() {
           quotes={quotes}
           fxRate={fxRate}
         />
-      ) : activeTab === 'diversification' ? (
+      )}
+
+      {globalAnalyticsTab === 'diversification' && (
         <HealthAnalysis />
-      ) : (
-        <AIIntelligence />
       )}
     </div>
   );
@@ -837,7 +828,7 @@ function GoalsAnalysis({ transactions, userProfile, updateProfile, formatCurrenc
       if (!t.date || t.date < START_DATE) return;
       const month = parseInt(t.date.substring(5, 7));
       const amt = Math.abs(Number(t.total) || 0);
-      const isAportacion = ['Compra', 'Depósito', 'Aportación'].includes(t.operation);
+      const isAportacion = ['Compra', 'Depósito', 'Aportación', 'Saldo Inicial'].includes(t.operation);
       if (!isAportacion) return;
 
       if (month <= 3) res.q1 += amt;

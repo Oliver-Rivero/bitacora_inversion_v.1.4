@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useData } from '../context/DataContext'
-import { Plus, Edit2, Trash2, X, Building2, Layers, Tag, Save, AlertTriangle, Upload, RefreshCw } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, Building2, Layers, Tag, Save, AlertTriangle, Upload, RefreshCw, GraduationCap } from 'lucide-react'
 import { clsx } from 'clsx'
 import * as XLSX from 'xlsx'
 
@@ -9,7 +9,8 @@ export default function ConfigView() {
     entities, addEntity, editEntity, deleteEntity,
     categories, addCategory, editCategory, deleteCategory,
     assetTypes, addAssetType, editAssetType, deleteAssetType,
-    resetAllData, bulkAddTransactions, addEntity: addEntityContext
+    resetAllData, bulkAddTransactions, addEntity: addEntityContext,
+    setShowAdvancedTutorial
   } = useData()
 
   const [activeTab, setActiveTab] = useState('entities')
@@ -468,7 +469,7 @@ export default function ConfigView() {
 
       {activeTab === 'advanced' && (
         <div style={{ animation: 'fadeUp 0.3s ease' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 24 }}>
             <div className="glass-panel" style={{ padding: 32 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
                 <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(255, 60, 60, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -526,6 +527,25 @@ export default function ConfigView() {
               >
                 {isImporting ? <RefreshCw size={18} className="spinning" /> : <Upload size={18} />}
                 {isImporting ? 'Importando...' : 'Seleccionar Archivo'}
+              </button>
+            </div>
+
+            <div className="glass-panel" style={{ padding: 32 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                <div style={{ width: 40, height: 40, borderRadius: 12, background: 'rgba(0, 113, 227, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <GraduationCap size={20} color="var(--accent)" />
+                </div>
+                <h3 style={{ margin: 0 }}>Tutorial Avanzado</h3>
+              </div>
+              <p style={{ color: 'var(--text-muted)', fontSize: 13, lineHeight: 1.6, marginBottom: 24 }}>
+                Inicia un tour interactivo exhaustivo que te guiará automáticamente por todas las secciones, sub-pestañas y funcionalidades de la aplicación.
+              </p>
+              <button 
+                onClick={() => setShowAdvancedTutorial(true)}
+                className="btn"
+                style={{ width: '100%', justifyContent: 'center', background: 'var(--accent)' }}
+              >
+                <GraduationCap size={18} /> Iniciar Recorrido
               </button>
             </div>
           </div>

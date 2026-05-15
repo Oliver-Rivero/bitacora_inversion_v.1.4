@@ -141,6 +141,7 @@ export default function AssetsView() {
 
     // Enhance asset object with calculated metrics
     a.currentValue = currentValue
+    a.marketPrice = (a.symbol && q.price) ? priceInEUR : null
     a.netCost = netCost
     a.avgPrice = a.totalPurchasedShares > 0 ? (a.invested / a.totalPurchasedShares) : 0
     a.profit = currentValue - netCost
@@ -555,8 +556,13 @@ export default function AssetsView() {
                       <div style={{ fontSize: 10, color: 'var(--text-muted)' }}>
                         {isFixed ? 'Rentabilidad pactada' : (
                           <>
+                            {a.marketPrice > 0 && (
+                              <div style={{ color: 'var(--success)', fontWeight: 700, marginTop: 4 }}>
+                                Cotización: {formatCurrency(a.marketPrice)}
+                              </div>
+                            )}
                             {!isFixed && a.avgPrice > 0 && (
-                              <div style={{ color: 'var(--accent)', fontWeight: 600, marginTop: 4 }}>
+                              <div style={{ color: 'var(--accent)', fontWeight: 600, marginTop: 2 }}>
                                 Precio Medio: {formatCurrency(a.avgPrice)}
                               </div>
                             )}

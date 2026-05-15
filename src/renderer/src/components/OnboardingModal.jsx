@@ -44,7 +44,14 @@ export default function OnboardingModal() {
       type: 'popover',
       targetId: 'tutorial-new-op',
       title: 'Registra Operaciones',
-      content: 'Una vez configurado, usa este botón para registrar compras, ventas, dividendos o aportaciones. ¡La app usa sistema FIFO para calcular tus plusvalías automáticamente!'
+      content: (
+        <>
+          <p>Una vez configurado, usa este botón para registrar compras, ventas, dividendos o aportaciones. ¡La app usa sistema FIFO para calcular tus plusvalías automáticamente!</p>
+          <div style={{ marginTop: 12, padding: 8, background: 'rgba(255, 255, 255, 0.05)', borderRadius: 8, fontSize: 12, color: '#93C5FD' }}>
+            💡 Si quieres profundizar más, encontrarás un <strong>Tutorial Avanzado</strong> muy completo dentro del menú Configuración.
+          </div>
+        </>
+      )
     }
   ]
 

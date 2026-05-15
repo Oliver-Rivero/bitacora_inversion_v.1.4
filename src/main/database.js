@@ -49,6 +49,8 @@ export function setupDatabase() {
       commission REAL,
       tax REAL,
       total REAL,
+      originalUnitPrice REAL,
+      originalTotal REAL,
       currency TEXT DEFAULT 'EUR',
       yield REAL,
       maturityDate TEXT,
@@ -152,7 +154,14 @@ export function setupDatabase() {
   
   try {
     db.prepare("ALTER TABLE transactions ADD COLUMN toEntityId INTEGER").run()
-    console.log('Database migration: Added toEntityId column to transactions table.')
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE transactions ADD COLUMN originalUnitPrice REAL").run()
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE transactions ADD COLUMN originalTotal REAL").run()
   } catch (e) {}
 
   // Seed basic categories if empty

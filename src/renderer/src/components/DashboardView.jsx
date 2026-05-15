@@ -56,9 +56,12 @@ export default function DashboardView() {
   let ytdRealizedGains = 0
   let ytdAportacionesTotal = 0
   let ytdIncomeTotal = 0
+  let strategicAportaciones = 0
+  let strategicIncome = 0
 
   const currentYear = new Date().getFullYear().toString()
   const jan1DateStr = `${currentYear}-01-01`
+  const STRATEGIC_START_DATE = `${currentYear}-04-23`
 
   const assetAllocationMap = {}
   const entityAllocationMap = {}
@@ -120,6 +123,16 @@ export default function DashboardView() {
     if (isCurrentYear && t.operation !== 'Saldo Inicial') {
       ytdAportacionesTotal += (val * mult);
     }
+
+    if (t.date && t.date >= STRATEGIC_START_DATE) {
+      if (['Compra', 'Depósito', 'Aportación', 'Saldo Inicial'].includes(t.operation)) {
+        strategicAportaciones += val;
+      } else if (['Venta', 'Retiro', 'Retirada'].includes(t.operation)) {
+        strategicAportaciones -= val;
+      } else if (['Intereses', 'Dividendos'].includes(t.operation)) {
+        strategicIncome += val;
+      }
+    }
   })
 
   let totalContributions = 0
@@ -163,14 +176,13 @@ export default function DashboardView() {
   const totalProfit = unrealizedGain + totalInterestDividends + totalRealizedGains
   const totalProfitPct = currentPortfolioCostBasis > 1 ? (totalProfit / currentPortfolioCostBasis) * 100 : 0
 
-  const lastYearSnapshot = [...snapshots].reverse().find(s => s.date < jan1DateStr)
-  let ytdProfit = 0
-  if (lastYearSnapshot) {
-    ytdProfit = netWorth - lastYearSnapshot.netWorth - ytdAportacionesTotal + ytdIncomeTotal
-  } else {
-    ytdProfit = totalProfit
-  }
-  const ytdProfitPct = lastYearSnapshot ? ((ytdProfit / (totalContributions - ytdAportacionesTotal)) * 100) : totalProfitPct
+  // --- Strategic Performance (since April 23) ---
+  const baseline = Number(userProfile?.baselineValue) || 57000;
+  const strategicBaseSnapshot = [...snapshots].reverse().find(s => s.date < STRATEGIC_START_DATE);
+  const baseValue = strategicBaseSnapshot ? strategicBaseSnapshot.netWorth : baseline;
+  
+  const ytdProfit = (netWorth - baseValue - strategicAportaciones) + strategicIncome;
+  const ytdProfitPct = (baseValue + strategicAportaciones) > 1 ? (ytdProfit / (baseValue + strategicAportaciones)) * 100 : 0;
 
 
 
@@ -302,7 +314,6 @@ export default function DashboardView() {
             className="btn btn-secondary" 
             onClick={() => {
               refreshPrices()
-              if (window.addToast) window.addToast('Actualizando precios de mercado...', 'info')
             }} 
             disabled={loading}
           >
@@ -326,6 +337,12 @@ export default function DashboardView() {
           )}
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
+          <div className="metric-title">Aportaciones Anuales Netas</div>
+          {loading ? <div className="skeleton" style={{ height: 34, width: '70%', marginTop: 8 }} /> : (
+            <div className="metric-value" style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>{formatCurrency(strategicAportaciones)}</div>
+          )}
+        </div>
+        <div className="metric-card glass-panel v5-hover-effect">
           <div className="metric-title">Rendimiento Total</div>
           {loading ? <div className="skeleton" style={{ height: 34, width: '90%', marginTop: 8 }} /> : (
             <div className={`metric-value ${totalProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
@@ -334,7 +351,7 @@ export default function DashboardView() {
           )}
         </div>
         <div className="metric-card glass-panel v5-hover-effect">
-          <div className="metric-title">Rendimiento (Año)</div>
+          <div className="metric-title">Rendimiento anual</div>
           {loading ? <div className="skeleton" style={{ height: 34, width: '60%', marginTop: 8 }} /> : (
             <div className={`metric-value ${ytdProfit >= 0 ? 'metric-positive' : 'metric-negative'}`} style={{ filter: isPrivate ? 'blur(8px)' : 'none', transition: 'filter 0.3s' }}>
               {formatCurrency(ytdProfit)} <span className="metric-percentage">({formatPercent(ytdProfitPct)}%)</span>
