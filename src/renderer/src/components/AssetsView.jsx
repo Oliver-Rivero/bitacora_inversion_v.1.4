@@ -169,8 +169,8 @@ export default function AssetsView() {
     a.marketPrice = (a.symbol && q.price) ? priceInEUR : null
     a.netCost = netCost
     a.avgPrice = a.totalPurchasedShares > 0 ? (a.invested / a.totalPurchasedShares) : 0
-    a.profit = currentValue - netCost
     a.totalCashFlow = a.generatedIncome + a.realizedGains
+    a.profit = (currentValue - netCost) + a.totalCashFlow
     a.profitPct = netCost > 1 ? (a.profit / netCost) * 100 : 0
     a.ytdProfit = a.profit 
     
