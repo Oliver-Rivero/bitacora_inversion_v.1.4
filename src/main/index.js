@@ -127,7 +127,7 @@ app.whenReady().then(() => {
 
   // Asset Types Handlers
   ipcMain.handle('db-get-asset-types', () => {
-    return db.prepare('SELECT * FROM asset_types ORDER BY name ASC').all()
+    return db.prepare('SELECT * FROM asset_types ORDER BY sortOrder ASC, name ASC').all()
   })
 
   ipcMain.handle('db-add-asset-type', (_, { name, categoryId, color }) => {
@@ -152,6 +152,33 @@ app.whenReady().then(() => {
     const stmt = db.prepare('DELETE FROM asset_types WHERE id = ?')
     stmt.run(id)
     return true
+  })
+
+  ipcMain.handle('db-update-asset-type-order', (_, items) => {
+    console.log('Main Process: Updating asset type order...', items)
+    try {
+      if (!Array.isArray(items)) {
+        throw new Error('Items is not an array')
+      }
+      
+      const stmt = db.prepare('UPDATE asset_types SET sortOrder = ? WHERE id = ?')
+      const transaction = db.transaction((data) => {
+        for (const item of data) {
+          if (item.id === undefined || item.sortOrder === undefined) {
+            console.warn('Main Process: Skipping invalid item', item)
+            continue
+          }
+          stmt.run(item.sortOrder, item.id)
+        }
+      })
+      
+      transaction(items)
+      console.log('Main Process: Asset type order update successful')
+      return { success: true }
+    } catch (err) {
+      console.error('Main Process: Error updating asset type order:', err)
+      return { success: false, error: err.message }
+    }
   })
 
   // Config Handlers
@@ -292,15 +319,22 @@ app.whenReady().then(() => {
   })
 
   ipcMain.handle('db-add-radar-asset', (_, asset) => {
-    const { symbol, name, initialPrice, notes } = asset
-    const stmt = db.prepare('INSERT INTO radar_assets (symbol, name, initialPrice, notes) VALUES (?, ?, ?, ?)')
-    const info = stmt.run(symbol.toUpperCase(), name, initialPrice, notes)
+    const { symbol, name, initialPrice, targetPrice, notes } = asset
+    const stmt = db.prepare('INSERT INTO radar_assets (symbol, name, initialPrice, targetPrice, notes) VALUES (?, ?, ?, ?, ?)')
+    const info = stmt.run(symbol.toUpperCase(), name, initialPrice, targetPrice, notes)
     return info.lastInsertRowid
   })
 
   ipcMain.handle('db-delete-radar-asset', (_, id) => {
     const stmt = db.prepare('DELETE FROM radar_assets WHERE id = ?')
     stmt.run(id)
+    return true
+  })
+
+  ipcMain.handle('db-edit-radar-asset', (_, asset) => {
+    const { id, name, targetPrice, notes } = asset
+    const stmt = db.prepare('UPDATE radar_assets SET name = ?, targetPrice = ?, notes = ? WHERE id = ?')
+    stmt.run(name, targetPrice, notes, id)
     return true
   })
 

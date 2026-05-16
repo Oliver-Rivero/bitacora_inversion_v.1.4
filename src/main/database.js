@@ -114,6 +114,7 @@ export function setupDatabase() {
       symbol TEXT NOT NULL UNIQUE,
       name TEXT,
       initialPrice REAL,
+      targetPrice REAL,
       notes TEXT,
       addedAt DATETIME DEFAULT CURRENT_TIMESTAMP
     );
@@ -162,6 +163,14 @@ export function setupDatabase() {
 
   try {
     db.prepare("ALTER TABLE transactions ADD COLUMN originalTotal REAL").run()
+  } catch (e) {}
+
+  try {
+    db.prepare("ALTER TABLE asset_types ADD COLUMN sortOrder INTEGER DEFAULT 0").run()
+  } catch (e) {}
+  
+  try {
+    db.prepare("ALTER TABLE radar_assets ADD COLUMN targetPrice REAL").run()
   } catch (e) {}
 
   // Seed basic categories if empty
@@ -236,6 +245,11 @@ export function addRadarAsset(asset) {
 
 export function deleteRadarAsset(id) {
   return db.prepare('DELETE FROM radar_assets WHERE id = ?').run(id)
+}
+
+export function editRadarAsset(asset) {
+  const { id, name, targetPrice, notes } = asset
+  return db.prepare('UPDATE radar_assets SET name = ?, targetPrice = ?, notes = ? WHERE id = ?').run(name, targetPrice, notes, id)
 }
 
 export function getDb() {

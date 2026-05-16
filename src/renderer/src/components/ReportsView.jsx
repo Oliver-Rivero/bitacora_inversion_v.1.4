@@ -1,7 +1,8 @@
 import React, { useState } from 'react'
 import { useData } from '../context/DataContext'
-import { Download, TrendingUp, History, FileSpreadsheet, FileJson, ArrowUpDown, PieChart, CheckCircle2 } from 'lucide-react'
+import { Download, TrendingUp, History, FileSpreadsheet, FileJson, ArrowUpDown, PieChart, CheckCircle2, Wallet } from 'lucide-react'
 import { exportLibroMayorExcel, exportLibroMayorCSV, exportDetailedReportPDF } from '../utils/exportUtils'
+import { MACRO_CATS } from '../utils/constants'
 
 export default function ReportsView() {
   const { transactions, entities, formatCurrency, formatNumber, formatPercent, fxRate, quotes } = useData()
@@ -112,7 +113,7 @@ export default function ReportsView() {
           } else {
             const costPerShare = t.shares > 0 ? t.total / t.shares : 0
             p.fifoQueue.push({ shares: t.shares, costBasisEUR: costPerShare })
-            if (inRange && t.operation === 'Compra') p.buysInRange += t.total
+            if (inRange && ['Compra', 'Aportación', 'Depósito', 'Saldo Inicial'].includes(t.operation)) p.buysInRange += t.total
           }
           p.shares += (t.shares || 0) * mult
           if (isBeforeRange) p.startShares = p.shares
@@ -221,8 +222,11 @@ export default function ReportsView() {
       
       const getPortfolioValueAt = (date, pricesMap, eurUsd, useLiveQuotes = false, inclusive = false) => {
         const holdings = {}
-        // If inclusive, we take transactions <= date. If not, < date.
+        // Filter out Liquidez category if requested
         sortedTxns.filter(t => inclusive ? t.date <= date : t.date < date).forEach(t => {
+          const cat = MACRO_CATS[t.assetType] || 'Otros'
+          if (cat === 'Liquidez') return // Exclude cash from portfolio value
+
           const symbol = (t.symbol || t.name || 'Unknown').toUpperCase()
           const key = `${t.entityId}_${symbol}`
           if (!holdings[key]) holdings[key] = { symbol, shares: 0, cost: 0, assetType: t.assetType, currency: t.currency || 'EUR' }
@@ -262,8 +266,8 @@ export default function ReportsView() {
         const op = t.operation
         const amt = Math.abs(Number(t.total) || 0)
         
-        if (['Aportación', 'Depósito', 'Saldo Inicial'].includes(op)) totalInflows += amt
-        if (['Retirada', 'Retiro'].includes(op)) totalOutflows += amt
+        if (['Compra', 'Aportación', 'Depósito', 'Saldo Inicial'].includes(op)) totalInflows += amt
+        if (['Venta', 'Retirada', 'Retiro'].includes(op)) totalOutflows += amt
         if (['Dividendos', 'Intereses'].includes(op)) totalIncome += amt
       })
 
@@ -273,6 +277,9 @@ export default function ReportsView() {
         const typeHoldings = {}
         const holdings = {}
         sortedTxns.filter(t => inclusive ? t.date <= date : t.date < date).forEach(t => {
+          const cat = MACRO_CATS[t.assetType] || 'Otros'
+          if (cat === 'Liquidez') return // Exclude cash from asset type values
+
           const symbol = (t.symbol || t.name || 'Unknown').toUpperCase()
           const key = `${t.entityId}_${symbol}`
           if (!holdings[key]) holdings[key] = { symbol, shares: 0, cost: 0, assetType: t.assetType, currency: t.currency || 'EUR' }
@@ -310,6 +317,9 @@ export default function ReportsView() {
       })
 
       allTypes.forEach(type => {
+        const cat = MACRO_CATS[type] || 'Otros'
+        if (cat === 'Liquidez') return // Exclude cash rows from the table
+        
         let flows = 0
         let gains = 0
         sortedTxns.filter(t => t.date > from && t.date <= to && t.assetType === type).forEach(t => {
@@ -469,7 +479,7 @@ export default function ReportsView() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 12, maxWidth: 600, margin: '0 auto 40px auto' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '16px 24px', background: 'rgba(126, 145, 177, 0.05)', borderRadius: 12 }}>
                     <span style={{ fontWeight: 600 }}>
-                      {annualReport.baselineDate ? `Capital de Partida (${annualReport.baselineDate})` : 'Patrimonio al Inicio (1 Ene)'}
+                      {annualReport.baselineDate ? `Valor de la cartera de Partida (${annualReport.baselineDate})` : 'Valor de la cartera al Inicio (1 Ene)'}
                     </span>
                     <span style={{ fontWeight: 800 }}>{formatCurrency(annualReport.startValue)}</span>
                   </div>
@@ -497,7 +507,7 @@ export default function ReportsView() {
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px 24px', background: 'var(--accent)', color: '#fff', borderRadius: 12, marginTop: 8, boxShadow: '0 8px 20px rgba(0, 113, 227, 0.2)' }}>
                     <span style={{ fontWeight: 700, fontSize: 18 }}>
-                      {annualReport.isCurrent ? 'Patrimonio Actual' : 'Patrimonio al Final (31 Dic)'}
+                      {annualReport.isCurrent ? 'Valor actual de la cartera' : 'Valor de la cartera al Final (31 Dic)'}
                     </span>
                     <span style={{ fontWeight: 900, fontSize: 22 }}>{formatCurrency(annualReport.endValue)}</span>
                   </div>

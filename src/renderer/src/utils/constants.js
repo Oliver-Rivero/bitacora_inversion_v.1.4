@@ -58,3 +58,5 @@ export const ENTITY_COLORS = {
   "Urbanitae": "#B9C6AE",
   "Otros": "#B0B0B0"
 }
+
+export const STRATEGIC_START_DATE = '2026-04-20'

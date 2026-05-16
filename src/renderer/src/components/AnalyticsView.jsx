@@ -15,6 +15,7 @@ import {
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 import { scaleLinear } from 'd3-scale';
 import worldData from '../assets/world-map.json';
+import { STRATEGIC_START_DATE, MACRO_CATS } from '../utils/constants';
 
 const geoUrl = worldData;
 
@@ -782,7 +783,7 @@ function GoalsAnalysis({ transactions, userProfile, updateProfile, formatCurrenc
   const [isSaving, setIsSaving] = useState(false);
 
   const currentYear = new Date().getFullYear();
-  const START_DATE = `${currentYear}-04-23`; 
+  const START_DATE = STRATEGIC_START_DATE; 
   const getVal = (key, def) => {
     // Priority 1: Local edit state if we are editing
     if (isEditing && localEdit && localEdit[key] !== undefined) return localEdit[key];
@@ -859,7 +860,9 @@ function GoalsAnalysis({ transactions, userProfile, updateProfile, formatCurrenc
           ytdIncomeTotal += amt;
           return;
         }
-        if (t.operation !== 'Saldo Inicial') {
+        
+        const cat = MACRO_CATS[t.assetType] || 'Otros';
+        if (cat !== 'Liquidez' && t.operation !== 'Saldo Inicial') {
           newInvestedInPeriod += (amt * mult);
         }
       }
@@ -877,8 +880,16 @@ function GoalsAnalysis({ transactions, userProfile, updateProfile, formatCurrenc
       const q = qKey ? quotes[qKey] : {};
       const effectiveFxRate = fxRate || 1.10;
       const livePrice = q.currency === 'USD' ? (q.price / effectiveFxRate) : (q.price || 0);
+
+      const sample = transactions.find(t => (t.symbol || t.name || '').toUpperCase() === data.symbol) || { assetType: 'Otros' };
+      const assetTypeObj = (assetTypes || []).find(at => at.name === sample.assetType);
+      const categoryObj = assetTypeObj ? (categories || []).find(c => c.id === assetTypeObj.categoryId) : null;
+      const macroName = categoryObj ? categoryObj.name : 'Otros';
+
       const val = (data.symbol && q.price) ? (data.shares * livePrice) : (data.invested - data.sold);
-      if (val > 0) currentNetWorth += val;
+      if (val > 0 && macroName !== 'Liquidez') {
+        currentNetWorth += val;
+      }
     });
 
     const baseline = Number(displayValues.baselineValue) || 57000;

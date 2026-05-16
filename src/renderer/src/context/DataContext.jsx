@@ -269,10 +269,16 @@ export function DataProvider({ children }) {
     addAssetType: async (at) => { await window.api.addAssetType(at); await fetchData(); },
     editAssetType: async (at) => { await window.api.editAssetType(at); await fetchData(); },
     deleteAssetType: async (id) => { await window.api.deleteAssetType(id); await fetchData(); },
+    updateAssetTypeOrder: async (items) => { 
+      const res = await window.api.updateAssetTypeOrder(items)
+      await fetchData()
+      return res
+    },
 
     // Radar CRUD
     radarAssets,
     addRadarAsset: async (a) => { await window.api.addRadarAsset(a); await fetchData(); },
+    editRadarAsset: async (a) => { await window.api.editRadarAsset(a); await fetchData(); },
     deleteRadarAsset: async (id) => { await window.api.deleteRadarAsset(id); await fetchData(); },
 
     // Milestones Management

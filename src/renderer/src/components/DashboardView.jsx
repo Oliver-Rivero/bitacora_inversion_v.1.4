@@ -7,7 +7,7 @@ import {
   ComposedChart
 } from 'recharts'
 import { clsx } from 'clsx'
-import { ENTITY_COLORS } from '../utils/constants'
+import { ENTITY_COLORS, STRATEGIC_START_DATE, MACRO_CATS } from '../utils/constants'
 
 const CustomTooltip = ({ active, payload, formatCurrency, formatNumber, formatPercent }) => {
   if (active && payload && payload.length) {
@@ -61,7 +61,6 @@ export default function DashboardView() {
 
   const currentYear = new Date().getFullYear().toString()
   const jan1DateStr = `${currentYear}-01-01`
-  const STRATEGIC_START_DATE = `${currentYear}-04-23`
 
   const assetAllocationMap = {}
   const entityAllocationMap = {}
@@ -75,6 +74,25 @@ export default function DashboardView() {
   sortedTxns.forEach(t => {
     const isIncome = t.operation === 'Intereses' || t.operation === 'Dividendos';
     const isCurrentYear = t.date && t.date >= jan1DateStr;
+    const val = t.total || (t.shares * t.unitPrice) || 0;
+    const mult = (t.operation === 'Venta' || t.operation === 'Retirada') ? -1 : 1;
+
+    // --- Strategic Performance (since Strategic Start Date) ---
+    if (t.date && t.date >= STRATEGIC_START_DATE) {
+      const cat = MACRO_CATS[t.assetType] || 'Otros';
+      if (cat !== 'Liquidez') {
+        if (['Compra', 'Depósito', 'Aportación', 'Saldo Inicial'].includes(t.operation)) {
+          strategicAportaciones += val;
+        } else if (['Venta', 'Retiro', 'Retirada'].includes(t.operation)) {
+          strategicAportaciones -= val;
+        }
+      }
+      
+      // Income counts even if it goes to cash, because it's performance
+      if (['Intereses', 'Dividendos'].includes(t.operation)) {
+        strategicIncome += val;
+      }
+    }
 
     if (isIncome) {
       totalInterestDividends += t.total
@@ -90,8 +108,6 @@ export default function DashboardView() {
 
     const symbol = (t.symbol || t.name || '').toUpperCase();
     const sharesNum = t.shares || 0;
-    const val = t.total || (t.shares * t.unitPrice) || 0;
-    const mult = (t.operation === 'Venta' || t.operation === 'Retirada') ? -1 : 1;
 
     const key = `${t.entityId}_${symbol}`;
     if (!entityAssetMap[key]) entityAssetMap[key] = { entityId: t.entityId, symbol: symbol, shares: 0, invested: 0, sold: 0 };
@@ -125,38 +141,30 @@ export default function DashboardView() {
     if (isCurrentYear && t.operation !== 'Saldo Inicial') {
       ytdAportacionesTotal += (val * mult);
     }
-
-    if (t.date && t.date >= STRATEGIC_START_DATE) {
-      if (['Compra', 'Depósito', 'Aportación', 'Saldo Inicial'].includes(t.operation)) {
-        strategicAportaciones += val;
-      } else if (['Venta', 'Retiro', 'Retirada'].includes(t.operation)) {
-        strategicAportaciones -= val;
-      } else if (['Intereses', 'Dividendos'].includes(t.operation)) {
-        strategicIncome += val;
-      }
-    }
   })
 
   let totalContributions = 0
   let currentPortfolioCostBasis = 0
 
   Object.values(entityAssetMap).forEach(data => {
-    const qKey = Object.keys(quotes).find(k => k.toUpperCase() === data.symbol)
+    const sample = transactions.find(t => (t.symbol || t.name || '').toUpperCase() === data.symbol) || { assetType: 'Otros' }
+    const assetTypeObj = assetTypes.find(at => at.name === sample.assetType)
+    const categoryObj = assetTypeObj ? categories.find(c => c.id === assetTypeObj.categoryId) : null
+    const macroName = categoryObj ? categoryObj.name : 'Otros'
+    
+    const qKey = Object.keys(quotes || {}).find(k => k.toUpperCase() === data.symbol)
     const q = qKey ? quotes[qKey] : {}
     const livePrice = (q.currency === 'USD' ? (q.price / (fxRate || 1.1)) : (q.price || 0))
     const currentAssetValue = (data.symbol && q.price) ? (data.shares * livePrice) : (data.invested - data.sold)
     
     if (currentAssetValue > 0.01) {
-      netWorth += currentAssetValue
+      if (macroName !== 'Liquidez') {
+        netWorth += currentAssetValue
+      }
       currentPortfolioCostBasis += (data.invested - data.sold)
       
       if (!entityAllocationMap[data.entityId]) entityAllocationMap[data.entityId] = { id: data.entityId, value: 0 }
       entityAllocationMap[data.entityId].value += currentAssetValue
-      
-      const sample = transactions.find(t => (t.symbol || t.name || '').toUpperCase() === data.symbol) || { assetType: 'Otros' }
-      const assetTypeObj = assetTypes.find(at => at.name === sample.assetType)
-      const categoryObj = assetTypeObj ? categories.find(c => c.id === assetTypeObj.categoryId) : null
-      const macroName = categoryObj ? categoryObj.name : 'Otros'
       
       if (!assetAllocationMap[sample.assetType]) {
         assetAllocationMap[sample.assetType] = { 
@@ -178,13 +186,12 @@ export default function DashboardView() {
   const totalProfit = unrealizedGain + totalInterestDividends + totalRealizedGains
   const totalProfitPct = currentPortfolioCostBasis > 1 ? (totalProfit / currentPortfolioCostBasis) * 100 : 0
 
-  // --- Strategic Performance (since April 23) ---
+  // --- Strategic Performance (since Strategic Start Date) ---
   const baseline = Number(userProfile?.baselineValue) || 57000;
-  const strategicBaseSnapshot = [...snapshots].reverse().find(s => s.date < STRATEGIC_START_DATE);
-  const baseValue = strategicBaseSnapshot ? strategicBaseSnapshot.netWorth : baseline;
   
-  const ytdProfit = (netWorth - baseValue - strategicAportaciones) + strategicIncome;
-  const ytdProfitPct = (baseValue + strategicAportaciones) > 1 ? (ytdProfit / (baseValue + strategicAportaciones)) * 100 : 0;
+  // Important: We use the same logic as AnalyticsView for consistency
+  const ytdProfit = (netWorth - baseline - strategicAportaciones) + strategicIncome;
+  const ytdProfitPct = (baseline + strategicAportaciones) > 1 ? (ytdProfit / (baseline + strategicAportaciones)) * 100 : 0;
 
 
 

@@ -10,19 +10,94 @@ import {
   ArrowUpRight, 
   ArrowDownRight,
   ChevronRight,
+  ChevronLeft,
   ChevronDown,
+  Check,
+  Settings,
+  Settings2,
   Info,
-  Calendar
+  Calendar,
+  GripVertical
 } from 'lucide-react'
+import { STRATEGIC_START_DATE } from '../utils/constants'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, CartesianGrid, Legend } from 'recharts'
 import { clsx } from 'clsx'
 
 export default function AssetsView() {
   const { 
     transactions, quotes, fxRate, formatCurrency, formatNumber, formatPercent,
-    categories, assetTypes 
+    categories, assetTypes, updateAssetTypeOrder
   } = useData()
   const [activeTab, setActiveTab] = useState('Todas')
+  const [isReordering, setIsReordering] = useState(false)
+  const [tempAssetTypes, setTempAssetTypes] = useState([])
+  const [draggedIndex, setDraggedIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
+
+  React.useEffect(() => {
+    if (isReordering) {
+      // Filter out Oro and any other system types we don't want to reorder
+      setTempAssetTypes(assetTypes.filter(t => t.name !== 'Oro'))
+    }
+  }, [isReordering, assetTypes])
+
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+
+  const handleDragOver = (e, index) => {
+    e.preventDefault()
+    setDragOverIndex(index)
+  }
+
+  const handleDrop = (index) => {
+    if (draggedIndex === null) return
+    const newItems = [...tempAssetTypes]
+    const item = newItems.splice(draggedIndex, 1)[0]
+    newItems.splice(index, 0, item)
+    setTempAssetTypes(newItems)
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handleSaveOrder = async () => {
+    console.log('AssetsView: Iniciando guardado de orden...')
+    console.log('AssetsView: API disponible:', !!window.api?.updateAssetTypeOrder)
+    
+    try {
+      if (!tempAssetTypes || tempAssetTypes.length === 0) {
+        console.warn('AssetsView: No hay tipos de activos para guardar')
+        setIsReordering(false)
+        return
+      }
+
+      const items = tempAssetTypes.map((t, index) => ({ id: t.id, sortOrder: index }))
+      console.log('AssetsView: Enviando items al servidor:', items)
+      
+      const res = await updateAssetTypeOrder(items)
+      console.log('AssetsView: Respuesta del servidor:', res)
+      
+      if (res && res.success) {
+        console.log('AssetsView: Orden guardado con éxito')
+        setIsReordering(false)
+        if (window.addToast) window.addToast('Orden guardado correctamente', 'success')
+      } else {
+        const errorMsg = (res && res.error) ? res.error : 'Error desconocido en el servidor'
+        console.error('AssetsView: El servidor reportó un error:', errorMsg)
+        if (window.addToast) window.addToast(`Error al guardar: ${errorMsg}`, 'error')
+      }
+    } catch (err) {
+      console.error('AssetsView: Error crítico (catch) al guardar orden:', err)
+      console.error('AssetsView: Detalles del error:', {
+        message: err.message,
+        stack: err.stack,
+        type: typeof err
+      })
+      if (window.addToast) window.addToast(`Error de comunicación: ${err.message}`, 'error')
+    }
+  }
+
   const [viewMode, setViewMode] = useState('General')
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString())
   const [selectedMonth, setSelectedMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'))
@@ -103,8 +178,19 @@ export default function AssetsView() {
     const val = t.total || (t.shares * t.unitPrice) || 0
     const sharesNum = t.shares || 0
 
-    if (t.operation === 'Compra' || t.operation === 'Saldo Inicial' || t.operation === 'Venta') {
+    const isStrategic = t.date && t.date >= STRATEGIC_START_DATE
+
+    if (t.operation === 'Compra' || t.operation === 'Saldo Inicial' || t.operation === 'Venta' || t.operation === 'Aportación' || t.operation === 'Retirada') {
       a.shares += (sharesNum * mult)
+      
+      if (isStrategic) {
+        if (t.operation === 'Venta' || t.operation === 'Retirada') {
+          a.ytdInvested = (a.ytdInvested || 0) - val
+        } else {
+          a.ytdInvested = (a.ytdInvested || 0) + val
+        }
+      }
+
       if (mult > 0) {
         a.invested += val
         a.pureInvested += (sharesNum * (t.unitPrice || 0))
@@ -146,7 +232,7 @@ export default function AssetsView() {
   })
 
   const availableTypes = ['Todas', ...assetTypes.map(at => at.name).filter(name => name !== 'Oro')]
-  const allAssets = Object.values(assetsMap).filter(a => Math.abs(a.shares) > 0.0001)
+  const allAssets = Object.values(assetsMap).filter(a => Math.abs(a.shares) > 0.0001 || Math.abs(a.generatedIncome) > 0.0001)
   const displayedAssets = activeTab === 'Todas' ? allAssets : allAssets.filter(a => a.type === activeTab)
 
   // Sort assets: highest value first
@@ -206,8 +292,9 @@ export default function AssetsView() {
     acc.profit += a.profit
     acc.totalCashFlow += a.totalCashFlow
     acc.expectedProfitTotal += (a.expectedProfit || 0)
+    acc.ytdInvested += (a.ytdInvested || 0)
     return acc
-  }, { currentValue: 0, invested: 0, profit: 0, expectedProfitTotal: 0, totalCashFlow: 0 })
+  }, { currentValue: 0, invested: 0, profit: 0, expectedProfitTotal: 0, totalCashFlow: 0, ytdInvested: 0 })
 
   const totalProfitPct = totals.invested > 1 ? (totals.profit / totals.invested) * 100 : 0
 
@@ -219,7 +306,7 @@ export default function AssetsView() {
           <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Gestión y seguimiento detallado de tu patrimonio</p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Total Cartera</div>
+          <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: 4 }}>Total {activeTab === 'Todas' ? 'Cartera' : activeTab}</div>
           <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-main)' }}>{formatCurrency(totals.currentValue)}</div>
         </div>
       </div>
@@ -413,49 +500,173 @@ export default function AssetsView() {
         </div>
       </div>
 
-      {/* Modern Tabs */}
+      {/* Tabs / Filter Navigation with Minimalist Reordering */}
       <div style={{ 
         display: 'flex', 
-        gap: 8, 
-        marginBottom: 32, 
-        overflowX: 'auto', 
-        paddingBottom: 4,
-        WebkitOverflowScrolling: 'touch'
+        alignItems: 'center',
+        gap: 12, 
+        marginBottom: 32,
+        position: 'relative'
       }}>
-        {availableTypes.map(typ => {
-          const isActive = activeTab === typ
-          const assetTypeObj = assetTypes.find(at => at.name === typ)
-          const color = assetTypeObj ? assetTypeObj.color : (categories.find(c => c.name === typ)?.color || 'var(--accent)')
-          return (
-            <button 
-              key={typ} 
-              onClick={() => setActiveTab(typ)}
+        <div style={{ 
+          display: 'flex', 
+          alignItems: 'center',
+          gap: 12, 
+          overflowX: 'auto', 
+          paddingBottom: 8,
+          flex: 1,
+          WebkitOverflowScrolling: 'touch'
+        }}>
+          <button 
+            onClick={() => {
+              if (isReordering) return
+              setActiveTab('Todas')
+            }}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: isReordering ? 'default' : 'pointer',
+              transition: 'all 0.3s ease',
+              background: activeTab === 'Todas' ? 'var(--accent)' : 'var(--panel-bg)',
+              color: activeTab === 'Todas' ? '#fff' : 'var(--text-muted)',
+              border: activeTab === 'Todas' ? '1px solid var(--accent)' : '1px solid var(--border)',
+              whiteSpace: 'nowrap',
+              opacity: isReordering && activeTab !== 'Todas' ? 0.5 : 1
+            }}
+          >
+            Todas
+          </button>
+
+          {(isReordering ? tempAssetTypes : assetTypes.filter(t => t.name !== 'Oro')).map((type, index) => {
+            const isActive = activeTab === type.name
+            const color = type.color || 'var(--accent)'
+            const isDraggingOver = dragOverIndex === index
+            
+            return (
+              <div 
+                key={type.id} 
+                draggable={isReordering}
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={() => handleDrop(index)}
+                onDragEnd={() => { setDraggedIndex(null); setDragOverIndex(null); }}
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 6,
+                  transform: isDraggingOver ? 'scale(1.05)' : 'scale(1)',
+                  transition: 'transform 0.2s ease'
+                }}
+              >
+                <button 
+                  onClick={() => {
+                    if (isReordering) return
+                    setActiveTab(type.name)
+                  }}
+                  style={{
+                    padding: '10px 18px',
+                    borderRadius: '12px',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    cursor: isReordering ? 'grab' : 'pointer',
+                    transition: 'all 0.3s ease',
+                    background: isActive ? color : 'var(--panel-bg)',
+                    color: isActive ? '#fff' : 'var(--text-muted)',
+                    border: isActive ? `1px solid ${color}` : (isDraggingOver ? `1px dashed ${color}` : '1px solid var(--border)'),
+                    whiteSpace: 'nowrap',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    boxShadow: isActive ? `0 4px 12px ${color}40` : 'none',
+                    opacity: isReordering && !isActive ? 0.7 : 1,
+                    animation: isReordering ? 'wiggle 0.3s infinite ease-in-out' : 'none'
+                  }}
+                >
+                  {isReordering ? <GripVertical size={12} style={{ opacity: 0.5 }} /> : <div style={{ width: 6, height: 6, borderRadius: '50%', background: isActive ? '#fff' : color }} />}
+                  {type.name}
+                </button>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Minimalist Personalization Toggle */}
+        <div style={{ 
+          display: 'flex', 
+          gap: 8, 
+          paddingLeft: 12, 
+          borderLeft: '1px solid var(--border-subtle)',
+          alignItems: 'center',
+          height: 38
+        }}>
+          {!isReordering ? (
+            <button
+              onClick={() => setIsReordering(true)}
+              title="Reordenar activos"
+              className="edit-sidebar-btn"
               style={{
-                padding: '10px 18px',
-                borderRadius: '12px',
-                fontSize: '13px',
-                fontWeight: 600,
-                cursor: 'pointer',
-                transition: 'all 0.3s ease',
-                background: isActive ? color : 'var(--panel-bg)',
-                color: isActive ? '#fff' : 'var(--text-muted)',
-                border: isActive ? `1px solid ${color}` : '1px solid var(--border)',
-                whiteSpace: 'nowrap',
+                width: 38,
+                height: 38,
+                borderRadius: 12,
                 display: 'flex',
                 alignItems: 'center',
-                gap: 8,
-                boxShadow: isActive ? `0 4px 12px ${color}40` : 'none'
+                justifyContent: 'center',
+                background: 'var(--bg-subtle)',
+                color: 'var(--text-muted)',
+                border: '1px solid var(--border-subtle)',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                opacity: 0.6
               }}
+              onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+              onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
             >
-              <div style={{ width: 6, height: 6, borderRadius: '50%', background: isActive ? '#fff' : color }} />
-              {typ}
+              <Settings2 size={18} />
             </button>
-          )
-        })}
+          ) : (
+            <div style={{ display: 'flex', gap: 6, animation: 'fadeUp 0.3s ease' }}>
+              <button
+                onClick={handleSaveOrder}
+                title="Guardar nuevo orden"
+                className="btn"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  background: 'var(--success)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+              >
+                <Check size={18} />
+              </button>
+              <button
+                onClick={() => setIsReordering(false)}
+                title="Cancelar"
+                className="btn-secondary"
+                style={{
+                  width: 38,
+                  height: 38,
+                  borderRadius: 12,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 0
+                }}
+              >
+                <ChevronRight size={18} style={{ transform: 'rotate(180deg)' }} />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Enhanced Summary Metrics */}
-      <div className="metrics-grid" style={{ marginBottom: 40 }}>
+      <div className="metrics-grid" style={{ marginBottom: 40, gridTemplateColumns: 'repeat(4, 1fr)' }}>
         <div className="metric-card glass-panel" style={{ borderLeft: '4px solid var(--accent)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="metric-title">Valor Actual</div>
@@ -481,6 +692,17 @@ export default function AssetsView() {
         </div>
 
         <div className="metric-card glass-panel" style={{ borderLeft: '4px solid #A29BBD' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="metric-title">Aportado (desde {new Date(STRATEGIC_START_DATE).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })})</div>
+            <Calendar size={16} className="text-muted" style={{ opacity: 0.5 }} />
+          </div>
+          <div className="metric-value" style={{ marginTop: 8, color: totals.ytdInvested >= 0 ? 'var(--text-main)' : 'var(--danger)' }}>
+            {totals.ytdInvested > 0 ? '+' : ''}{formatCurrency(totals.ytdInvested)}
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 4 }}>Flujo neto del año en curso</div>
+        </div>
+
+        <div className="metric-card glass-panel" style={{ borderLeft: '4px solid #7E91B1' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div className="metric-title">Inversión Neta</div>
             <BarChart3 size={16} className="text-muted" style={{ opacity: 0.5 }} />

@@ -99,7 +99,37 @@ function CommandPalette({ isOpen, onClose, onSelect, items }) {
 }
 
 export default function App() {
-  const { setLedgerFormRequested, transactions, quotes, fxRate, loading, showTutorial, showAdvancedTutorial } = useData()
+  // --- Radar Alert Check on Startup ---
+  const { 
+    setLedgerFormRequested, transactions, quotes, fxRate, 
+    loading, showTutorial, showAdvancedTutorial, radarAssets 
+  } = useData()
+  const [hasCheckedRadar, setHasCheckedRadar] = useState(false)
+
+  useEffect(() => {
+    if (!loading && radarAssets.length > 0 && Object.keys(quotes).length > 0 && !hasCheckedRadar) {
+      const hits = radarAssets.filter(asset => {
+        const quote = quotes[asset.symbol]
+        if (!quote || !asset.targetPrice) return false
+        const price = quote.price
+        
+        // Alert logic consistent with RadarView
+        return Math.abs(price - asset.targetPrice) / asset.targetPrice < 0.01 || 
+               (asset.initialPrice > asset.targetPrice && price <= asset.targetPrice) ||
+               (asset.initialPrice < asset.targetPrice && price >= asset.targetPrice)
+      })
+
+      if (hits.length > 0) {
+        if (hits.length === 1) {
+          addToast(`🎯 Radar: ${hits[0].name || hits[0].symbol} ha alcanzado su precio objetivo.`, 'success')
+        } else {
+          addToast(`🎯 Radar: ${hits.length} activos han alcanzado su precio objetivo.`, 'success')
+        }
+      }
+      setHasCheckedRadar(true)
+    }
+  }, [loading, radarAssets, quotes, hasCheckedRadar])
+
   const [activeTab, setActiveTab] = useState('dashboard')
   const [theme, setTheme] = useState('light')
   const [mood, setMood] = useState('neutral')
@@ -336,7 +366,7 @@ export default function App() {
             {theme === 'dark' ? 'Modo Claro' : 'Modo Oscuro'}
           </div>
           <div style={{ padding: '8px 12px', fontSize: 10, color: 'var(--text-muted)', opacity: 0.6 }}>
-            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E8E' }}>beta 2.0</div>
+            <div style={{ fontSize: 10, opacity: 1, fontWeight: 600, marginTop: 4, letterSpacing: 1, color: '#8E8E8E' }}>beta 2.1</div>
           </div>
         </div>
       </div>

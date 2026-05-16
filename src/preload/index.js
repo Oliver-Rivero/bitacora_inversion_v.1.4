@@ -22,6 +22,7 @@ const api = {
   addAssetType: (type) => ipcRenderer.invoke('db-add-asset-type', type),
   editAssetType: (type) => ipcRenderer.invoke('db-edit-asset-type', type),
   deleteAssetType: (id) => ipcRenderer.invoke('db-delete-asset-type', id),
+  updateAssetTypeOrder: (items) => ipcRenderer.invoke('db-update-asset-type-order', items),
   getHistoricalPrice: (symbol, date) => ipcRenderer.invoke('finance-get-historical-price', { symbol, date }),
   
   // Configs
@@ -48,6 +49,7 @@ const api = {
   // Radar
   getRadarAssets: () => ipcRenderer.invoke('db-get-radar-assets'),
   addRadarAsset: (asset) => ipcRenderer.invoke('db-add-radar-asset', asset),
+  editRadarAsset: (asset) => ipcRenderer.invoke('db-edit-radar-asset', asset),
   deleteRadarAsset: (id) => ipcRenderer.invoke('db-delete-radar-asset', id),
   getChartData: (symbol, range) => ipcRenderer.invoke('finance-get-chart-data', { symbol, range }),
   resolveISIN: (isin) => ipcRenderer.invoke('finance-resolve-isin', isin),
